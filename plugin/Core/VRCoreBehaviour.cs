@@ -1204,7 +1204,7 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
     private delegate void EncodeToPngDelegate(IntPtr tex, out BlittableArrayWrapperNative ret);
     private static EncodeToPngDelegate s_encodeToPng;
 
-    // ImageConversion.EncodeToPNG is unusable through the interop assemblies (NOTES.md 1.4 issue 2); call the icall directly.
+    // ImageConversion.EncodeToPNG is unusable through the interop assemblies (docs/DEV_NOTES.md 1.4 issue 2); call the icall directly.
     private static void SavePng(RenderTexture rt, string path)
     {
         var prev = RenderTexture.active;
