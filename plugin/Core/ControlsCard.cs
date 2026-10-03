@@ -53,7 +53,7 @@ internal sealed class ControlsCard
                 text.fontSharedMaterial = _textMaterial;
             }
             text.fontSize = 33f; text.color = new Color(0.36f, 0.95f, 0.86f); text.raycastTarget = false;
-            text.text = "<size=48>VR controls</size>\n\nLeft stick: walk / navigate\nRight stick: turn / radio knob\nA or pointing trigger: use / select\nB: back     X: skip     Y: hint\nGrip: RT + RB (run / speed up / radio band)\nLeft Menu: pause\nHold both stick clicks: recenter\n\n<size=27>Press any controller button to continue</size>";
+            text.text = "<size=48>VR controls</size>\n\nLeft stick: walk / navigate\nRight stick: turn / radio knob\nTrigger (either hand): use / click / continue\nA: use / select     B: back     X: skip     Y: hint\nGrip: RT + RB (run / speed up / radio band)\nLeft Menu: pause\nHold both stick clicks: recenter\n\n<size=27>Press any controller button to continue</size>";
             var tr = labelGo.GetComponent<RectTransform>(); tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.offsetMin = new Vector2(35f, 25f); tr.offsetMax = new Vector2(-35f, -25f);
         }
         _root.transform.SetPositionAndRotation(head.position + head.forward * (1.3f * scale), head.rotation);

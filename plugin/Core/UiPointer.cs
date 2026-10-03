@@ -85,9 +85,12 @@ internal sealed unsafe class UiPointer
     private Il2CppSystem.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult> _hits;
     private int _lastHoveredSelectable;
     private UnityEngine.UI.Selectable _hoverSel;
-    private bool _trigPrev, _swallow;
-    /// <summary>The pointing hand's trigger click was delivered straight to the button under the laser; do not also send A.</summary>
-    public static bool SwallowTrigger { get; private set; }
+    private bool _tlPrev, _trPrev, _aPrev, _trigSouth, _trigWest, _swallowA;
+    /// <summary>Pointer screens: what a held trigger is for the game (latched when it was pulled).</summary>
+    public static bool TriggerSouth { get; private set; }
+    public static bool TriggerWest { get; private set; }
+    /// <summary>The A press was delivered straight to a button; do not also send it as gamepad A.</summary>
+    public static bool SwallowA { get; private set; }
     private bool _navOverride;
     private Vector2 _navPx;
     private const float NavReleasePixels = 70f;
@@ -103,20 +106,7 @@ internal sealed unsafe class UiPointer
     {
         var es = UnityEngine.EventSystems.EventSystem.current;
         if (es == null) return;
-        if (_ped == null || _ped.Pointer == IntPtr.Zero) _ped = new UnityEngine.EventSystems.PointerEventData(es);
-        _hits ??= new Il2CppSystem.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
-        _ped.position = px;
-        _hits.Clear();
-        es.RaycastAll(_ped, _hits);
-        UnityEngine.UI.Selectable sel = null;
-        for (int i = 0; i < _hits.Count && sel == null; i++)
-        {
-            var go = _hits[i].gameObject;
-            if (go == null) continue;
-            var s = go.GetComponentInParent<UnityEngine.UI.Selectable>();
-            if (s != null && s.IsActive() && s.IsInteractable()) sel = s;
-            else if (go.GetComponentInParent<Canvas>() != null) break; // the topmost UI under the laser is not a button
-        }
+        var sel = SelectableAt(es, px);
         var cur = es.currentSelectedGameObject;
         int curId = cur != null ? cur.GetInstanceID() : 0;
         if (curId != _lastCurrentId) { _selectionChanges++; _lastCurrentId = curId; }
@@ -162,45 +152,88 @@ internal sealed unsafe class UiPointer
         }
     }
 
-    /// <summary>
-    /// Before the virtual gamepad is fed: a trigger press on a button under the laser is delivered to that button
-    /// directly (its own submit handler) instead of as gamepad A. A goes through the EventSystem, which needs the game
-    /// window to have focus and the laser's selection to survive the frame; a direct submit does not.
-    /// </summary>
-    public void PrePress(VRInputMode mode)
+    /// <summary>The interactable button under a screen point (null: nothing, or something that is not a button is on top).</summary>
+    private UnityEngine.UI.Selectable SelectableAt(UnityEngine.EventSystems.EventSystem es, Vector2 px)
     {
-        SwallowTrigger = false;
-        bool on = mode == VRInputMode.Pointer && !MouseScheme && ControllersPresent && !_failed;
-        if (!on) { _trigPrev = _swallow = false; return; }
-        bool trig = ButtonGate.Down(VRRig.Controller(HandSide), VRButton.Trigger) || ButtonGate.Down(VRRig.RightController, VRButton.Primary);
-        if (trig && !_trigPrev)
+        if (_ped == null || _ped.Pointer == IntPtr.Zero) _ped = new UnityEngine.EventSystems.PointerEventData(es);
+        _hits ??= new Il2CppSystem.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+        _ped.position = px;
+        _hits.Clear();
+        es.RaycastAll(_ped, _hits);
+        for (int i = 0; i < _hits.Count; i++)
         {
+            var go = _hits[i].gameObject;
+            if (go == null) continue;
+            var s = go.GetComponentInParent<UnityEngine.UI.Selectable>();
+            if (s != null && s.IsActive() && s.IsInteractable()) return s;
+            if (go.GetComponentInParent<Canvas>() != null) break; // the topmost UI under the laser is not a button
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Before the virtual gamepad is fed: decides what a trigger pull / A press means on a pointer screen.
+    /// A trigger is the mouse button of the PC game: on a button under the laser it clicks that button (delivered to
+    /// its own submit handler, nothing sent to the game); anywhere else it is X (next dialog line) plus A (the game's
+    /// cursor click). Either hand's trigger does the same; the hand that pulled last holds the laser.
+    /// While dialog answers are up and the laser is not on one, A is left out: the game would take the answer it has
+    /// preselected, which is not what was pointed at.
+    /// </summary>
+    public void PrePress(VRInputMode mode, FlatScreen screen)
+    {
+        TriggerSouth = TriggerWest = SwallowA = false;
+        ChooseHand();
+        bool tl = ButtonGate.Down(VRRig.LeftController, VRButton.Trigger), tr = ButtonGate.Down(VRRig.RightController, VRButton.Trigger);
+        bool a = ButtonGate.Down(VRRig.RightController, VRButton.Primary);
+        bool on = mode == VRInputMode.Pointer && !MouseScheme && ControllersPresent && !_failed;
+        bool trigEdge = on && ((tl && !_tlPrev) || (tr && !_trPrev)), aEdge = on && a && !_aPrev;
+        _tlPrev = tl; _trPrev = tr; _aPrev = a;
+        if (!on || (!tl && !tr)) _trigSouth = _trigWest = false;
+        if (!on || !a) _swallowA = false;
+        if (trigEdge || aEdge)
+        {
+            bool clicked = false, slider = false, answers = false;
             try
             {
-                // The button under the laser, or (stick navigation / laser off the buttons) the selected one.
-                var sel = _navOverride ? null : _hoverSel;
-                var esNow = UnityEngine.EventSystems.EventSystem.current;
-                if (sel == null && esNow != null && esNow.currentSelectedGameObject != null)
-                    sel = esNow.currentSelectedGameObject.GetComponent<UnityEngine.UI.Selectable>();
-                if (sel != null && sel.IsActive() && sel.IsInteractable() && sel.TryCast<UnityEngine.UI.Slider>() == null)
+                var es = UnityEngine.EventSystems.EventSystem.current;
+                if (es != null)
                 {
-                    var es = UnityEngine.EventSystems.EventSystem.current;
-                    var submit = sel.TryCast<UnityEngine.EventSystems.ISubmitHandler>();
-                    if (es != null && submit != null)
+                    // The laser as it is now (the hand may have changed with this very pull).
+                    var hand = Hand;
+                    UnityEngine.UI.Selectable hover = null;
+                    if (hand.IsAimTracked && hand.Aim != null && screen.PanelHit(new Ray(hand.Aim.position, hand.Aim.forward), out var uv, out _))
+                        hover = SelectableAt(es, new Vector2(Mathf.Clamp01(uv.x) * Screen.width, Mathf.Clamp01(uv.y) * Screen.height));
+                    UnityEngine.UI.Selectable selected = null;
+                    var cur = es.currentSelectedGameObject;
+                    if (cur != null && cur.activeInHierarchy) selected = cur.GetComponent<UnityEngine.UI.Selectable>();
+                    if (selected != null && !(selected.IsActive() && selected.IsInteractable())) selected = null;
+                    answers = selected != null && GameState.Top == _Code.Player.EWatcherState.Dialog;
+
+                    // Stick navigation chose the button: trigger and A press that one. A alone also presses the selected one.
+                    var target = _navOverride ? selected : hover;
+                    if (target == null && !trigEdge) target = selected;
+                    slider = target != null && target.TryCast<UnityEngine.UI.Slider>() != null;
+                    var submit = target != null && !slider ? target.TryCast<UnityEngine.EventSystems.ISubmitHandler>() : null;
+                    if (submit != null)
                     {
-                        if (es.currentSelectedGameObject != sel.gameObject) es.SetSelectedGameObject(sel.gameObject);
+                        if (es.currentSelectedGameObject != target.gameObject) es.SetSelectedGameObject(target.gameObject);
                         submit.OnSubmit(new UnityEngine.EventSystems.BaseEventData(es));
-                        _swallow = true;
+                        clicked = true;
                         Haptics.Tick(HandSide, "submit", 0.4f, 0.04f);
-                        CorePlugin.Log.LogInfo($"VR UI click -> {sel.name} ({sel.GetIl2CppType().Name}) focus={Application.isFocused}/{es.isFocused}");
+                        CorePlugin.Log.LogInfo($"VR UI click -> {target.name} ({target.GetIl2CppType().Name}) by {(trigEdge ? "trigger" : "A")}");
                     }
                 }
             }
-            catch (Exception e) { _swallow = false; CorePlugin.LogThrottled("direct-submit", "Direct UI click failed, using gamepad A instead: " + e.Message); }
+            catch (Exception e) { CorePlugin.LogThrottled("direct-submit", "Direct UI click failed, using the gamepad button instead: " + e.Message); }
+            if (trigEdge)
+            {
+                _trigWest = !clicked && !slider;
+                _trigSouth = !clicked && !(answers && !slider);
+                if (VRConfig.Verbose.Value && !clicked) CorePlugin.Log.LogInfo($"VR trigger -> {(_trigSouth ? "A" : "")}{(_trigWest ? "X" : "")} (answers={answers})");
+            }
+            if (aEdge) _swallowA = clicked;
         }
-        if (!trig) _swallow = false;
-        _trigPrev = trig;
-        SwallowTrigger = _swallow;
+        TriggerSouth = _trigSouth; TriggerWest = _trigWest; SwallowA = _swallowA;
     }
 
     // Right stick scrolls the list under the laser (the game's own scroll follows the gamepad cursor, which the laser owns).

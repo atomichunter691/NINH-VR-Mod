@@ -893,3 +893,32 @@ backing up. All fixes **simulator-verified only**.
 * **A and trigger both click directly**: the button under the laser, else the selected one (`UiPointer.PrePress`).
 * Debug: `leave` (TryLeave on the looking view), `trace` also logs B. Sim: visitor dialogue is reachable with `act 1`
   (peephole) + X twice; window narration ends after X three times.
+
+### 2.17 Window smear, triggers, dialog presses - 2026-10-03
+
+User (headset): window picture "infinitely smears" at top and bottom; a trigger only works once, triggers must be
+alternated; dialog options need several presses, do not appear, or the wrong one is taken.
+
+* **Root cause of all the trigger / dialog complaints (from the user's own log, then reproduced):** the pointing hand
+  switched to whichever trigger was pulled last (`ChooseHand`), and the two triggers had different meanings (pointing
+  hand = A, other hand = X) decided *before* the switch. So a pull of the other trigger was X for exactly one frame
+  (line skipped) and A from the next frame on; a second pull of the same trigger was A only, which does not advance
+  a line. Hence "alternate triggers". The one-frame X followed by A also took the preselected answer the moment the
+  answers came up ("option never appears" / "wrong one"), and `PrePress` submitted the *selected* button when the
+  laser was on none.
+* **Fix:** a trigger never changes meaning with the laser hand (`VRTriggerRole`, `VRCoreBehaviour.TriggerRole`):
+  hallway both = A; window / peephole both = X ("Listen", what LMB is on PC); radio = knob twist; film / dream right = A,
+  left = X; pointer screens are decided per pull in `UiPointer.PrePress` (which now runs `ChooseHand` first and
+  raycasts the laser of the hand that pulled): on a Selectable -> direct `OnSubmit`, nothing sent; otherwise X + A
+  (LMB on PC is DialogSkip + Select), except A is withheld in `Dialog` state while an answer is selected (the game
+  would take the preselected one). A button: unchanged, also presses the selected button when the laser is on none.
+* **Dialog answers are `FakeOptionView`** (Selectable + ISubmitHandler): direct submit works on them.
+* **Window dome:** the picture ended at +-31 deg pitch (110 deg x aspect) and `wrapModeV = Clamp` smeared its last row
+  up to the pole. UVs are now computed per vertex (`FlatScreen.SetDomeUvs`): v = 0.5 + 0.5 * (1 - (1 - |pitch|/fill)^n),
+  n = 2 * fill / (span * aspect): true to scale at the horizon, drawn out towards the edge, which lies at
+  `WindowFillDegrees` (new, 70). `WindowViewDegrees` default 110 -> 130 (less stretch: about 1.4x at 20 deg, 1.7x at 30).
+* Sim-verified: Continue click; window narration advanced twice with the right trigger and the view captured level /
+  45 up / 40 down; peephole visitor: right trigger x2 brought the answers up without taking one, laser on "Fine" +
+  same trigger -> `VR UI click -> Option View(Clone) (FakeOptionView)` -> `Neighbour_Entrance_2`; left trigger x3
+  advanced three lines. Core debug commands go in `logs\cmd\*.vr` files (not `cmd.ps1`, which is DevTools' `*.cmd`).
+* Not verified: how the bend looks in the headset (daylight pictures), rooms / phone / fridge with the new trigger rule.

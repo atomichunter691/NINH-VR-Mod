@@ -12,11 +12,27 @@ namespace NIVR.Core;
 /// moves the game's gamepad cursor in menus, and button prompts switch to controller glyphs.
 ///
 ///   left stick  -> left stick (move / navigate)        right stick -> right stick (UI cursor, scroll; look is disabled)
-///   A, R trigger-> South (interact / select / submit)  B           -> East (back / cancel)
-///   X, L trigger-> West (skip dialog line)             Y           -> North (tutorial / hint)
+///   A           -> South (interact / select / submit)  B           -> East (back / cancel)
+///   X           -> West (skip dialog line)             Y           -> North (tutorial / hint)
+///   triggers    -> depends on the screen, see <see cref="VRTriggerRole"/>
 ///   left Menu   -> Start (pause)                       R stick click -> crouch, L stick click -> left stick press
 ///   R grip      -> right trigger + RB (run, speed-up)  L grip      -> left trigger + LB
 /// </summary>
+/// <summary>What the two triggers are for the game on the current screen.</summary>
+internal enum VRTriggerRole
+{
+    /// <summary>Right = A, left = X (film, dream).</summary>
+    Hands,
+    /// <summary>Both = A (hallway: interact with what the laser is on).</summary>
+    South,
+    /// <summary>Both = X (window / peephole: listen on, like the mouse button of the PC game).</summary>
+    West,
+    /// <summary>Radio: the pointing hand's trigger + a twist turns the knob.</summary>
+    Knob,
+    /// <summary>Screens with the laser: decided per pull by <see cref="UiPointer.PrePress"/>.</summary>
+    Pointer,
+}
+
 internal sealed unsafe class VirtualGamepad
 {
     // UnityEngine.InputSystem.LowLevel.StateEvent carrying a GamepadState ('GPAD'), laid out by hand because the
@@ -66,9 +82,9 @@ internal sealed unsafe class VirtualGamepad
 
     /// <param name="zeroRightStick">the right stick is ours: snap turn (hallway) or scrolling the list under the laser (pointer screens)</param>
     /// <param name="silent">the controllers drive the virtual mouse / keyboard instead (pointer mode)</param>
-    /// <param name="knobTwist">radio: trigger + twist turns the knob</param>
-    /// <param name="pointerHand">its trigger is A (interact); the other trigger is X (skip dialog line)</param>
-    public void Tick(bool vrActive, bool zeroRightStick, bool silent = false, bool knobTwist = false, VRHand pointerHand = VRHand.Right)
+    /// <param name="triggers">what the triggers are on this screen</param>
+    /// <param name="pointerHand">the hand that twists the radio knob</param>
+    public void Tick(bool vrActive, bool zeroRightStick, bool silent = false, VRTriggerRole triggers = VRTriggerRole.Hands, VRHand pointerHand = VRHand.Right)
     {
         if (_failed) return;
         var l = VRRig.LeftController; var r = VRRig.RightController;
@@ -99,7 +115,8 @@ internal sealed unsafe class VirtualGamepad
             DebugNavigating = debug && e.leftStick.sqrMagnitude > 0.25f;
             // Walking the hallway: the right stick is snap turn only (the game's look is switched off anyway).
             if (zeroRightStick && !DebugRightStick.HasValue) e.rightStick = Vector2.zero;
-            var p = VRRig.Controller(pointerHand); var o = VRRig.Controller(pointerHand == VRHand.Right ? VRHand.Left : VRHand.Right);
+            var p = VRRig.Controller(pointerHand);
+            bool knobTwist = triggers == VRTriggerRole.Knob;
             bool twist = knobTwist && p.IsTracked && p.Aim != null && ButtonGate.Down(p, VRButton.Trigger) && e.rightStick.sqrMagnitude < 0.25f;
             if (twist)
             {
@@ -123,9 +140,20 @@ internal sealed unsafe class VirtualGamepad
             }
             else _twisting = false;
             uint b = DebugButtons;
-            if (!UiPointer.SwallowTrigger && (ButtonGate.Down(r, VRButton.Primary) || (!twist && ButtonGate.Down(p, VRButton.Trigger)))) b |= South;
+            if (ButtonGate.Down(r, VRButton.Primary) && !UiPointer.SwallowA) b |= South;
+            if (ButtonGate.Down(l, VRButton.Primary)) b |= West;
+            bool tl = ButtonGate.Down(l, VRButton.Trigger), tr = ButtonGate.Down(r, VRButton.Trigger);
+            // A trigger never changes meaning with the hand that holds the laser (it used to: the other hand's
+            // trigger was X for one frame and A from then on, so every second pull did something else).
+            switch (triggers)
+            {
+                case VRTriggerRole.Pointer: if (UiPointer.TriggerSouth) b |= South; if (UiPointer.TriggerWest) b |= West; break;
+                case VRTriggerRole.South: if (tl || tr) b |= South; break;
+                case VRTriggerRole.West: if (tl || tr) b |= West; break;
+                case VRTriggerRole.Knob: if (!twist && ButtonGate.Down(p, VRButton.Trigger)) b |= South; break;
+                default: if (tr) b |= South; if (tl) b |= West; break;
+            }
             if (ButtonGate.Down(r, VRButton.Secondary) && !PauseGuard.SwallowEast) b |= East;
-            if (ButtonGate.Down(l, VRButton.Primary) || (!knobTwist && ButtonGate.Down(o, VRButton.Trigger))) b |= West;
             if (ButtonGate.Down(l, VRButton.Secondary)) b |= North;
             if (ButtonGate.Down(l, VRButton.Menu)) b |= Start;
             if (ButtonGate.Down(l, VRButton.Stick)) b |= LeftStick;

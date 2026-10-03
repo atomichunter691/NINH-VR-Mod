@@ -16,9 +16,10 @@ For the Windows x64 Steam game version 1.3.19 (Unity 6000.3.10f1). Tested with Q
 |---|---|---|
 | Left stick | Walk; menu navigation; left/right changes sliders | Left stick / d-pad |
 | Right stick left/right | Snap turn 30° while walking; cursor or radio knob in views | Right stick |
-| A / pointing-hand trigger | Interact, select, submit; hold and aim along sliders | A |
+| A | Interact, select, submit | A |
+| Either trigger | Hallway: interact. With the laser: click the button it is on (hold and aim along sliders), anywhere else continue the dialog. Window / peephole: listen on | A / X |
 | B | Back, exit room, cancel | B |
-| X / other-hand trigger | Skip dialog | X |
+| X | Skip dialog | X |
 | Y | Tutorial / hint | Y |
 | Right grip | Run, speed up text, radio handle | **RT and RB** |
 | Left grip | Other radio handle | **LT and LB** |
@@ -28,7 +29,7 @@ For the Windows x64 Steam game version 1.3.19 (Unity 6000.3.10f1). Tested with Q
 | Hold right Menu for 1 s, if exposed | Recenter | — |
 | F8 on keyboard / VR Settings “Recenter now” | Recenter | — |
 
-The pointing hand starts on the right; pull the other trigger to switch. Trigger + controller twist tunes the radio. Quest's right system button is reserved by the runtime and is usually unavailable to the mod. Use both stick clicks or Settings instead.
+The laser starts in the right hand; pull the other trigger to move it to that hand (both triggers do the same thing). Trigger + controller twist tunes the radio. Quest's right system button is reserved by the runtime and is usually unavailable to the mod. Use both stick clicks or Settings instead.
 
 ## Config
 
@@ -42,7 +43,7 @@ The VR section includes turning, pointer hand, seated height, recenter, world sc
 | Tracking | `PhysicalCrouch=false`, `CrouchDrop=0.35` m. Respects game crouch zones; stands 8 cm above the trigger threshold. |
 | Input | `ControllerAsGamepad=true`, `PointerScheme=Gamepad`, `PointerHand=Right`, `InteractionRay=Controller`, `MoveSystemCursor=true` (unused while legacy mouse patch is active), `VibrationStrength=1` (0 disables), `RadioDetentDegrees=12` |
 | Rendering | `RenderScale=1`, `MSAA=4`, `NearClip=0.05`, `FarClip=0` (game value), `FlipY=true`, `Mirror=GameCamera`, `ControllerVisuals=true`, `WarnLowUiResolution=true` |
-| Rendering | `FlatScreen=Auto`, `UiDistance=1.5`, `UiWidth=2.1`, `RoomDistance=3`, `RoomEnclosure=true`, `RoomViewDegrees=105`, `WindowDistance=10`, `WindowDome=true`, `WindowViewDegrees=110`, `PeepholeEye=Right`, `PeepholeDegrees=60` |
+| Rendering | `FlatScreen=Auto`, `UiDistance=1.5`, `UiWidth=2.1`, `RoomDistance=3`, `RoomEnclosure=true`, `RoomViewDegrees=105`, `WindowDistance=10`, `WindowDome=true`, `WindowViewDegrees=130`, `WindowFillDegrees=70`, `PeepholeEye=Right`, `PeepholeDegrees=60` |
 | Rendering | `LazyFollowHud=false`, `HudFollowAngle=20`, `SubtitleOffset=0` canvas units (positive lowers the caption panel, clamped to keep it on screen) |
 | Comfort | `ComfortFade=true`, `FadeSeconds=0.22`, `JumpDistance=0.45` m/frame, `JumpAngle=35` degrees/frame, `HeadCollisionFade=true`, `HeadCollisionRadius=0.08` m, `MotionVignette=false` |
 | Comfort | `DisableMouseLook`, `DisableHeadBob`, `DisableCameraShake`, `DisableVignette`, `DisableLensDistortion`, `DisableDepthOfField`, `DisableMotionBlur`, `DisableChromaticAberration` default true; `DisableFilmGrain=false` |

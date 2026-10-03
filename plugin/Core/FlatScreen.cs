@@ -68,19 +68,47 @@ internal sealed class FlatScreen
         return go.transform;
     }
 
-    // The view outside a window: the inside of a sphere section around the player. The picture covers the middle
-    // (angle-linear, so it is not stretched towards the edges) and continues beyond its borders (mirrored sideways,
-    // sky and ground stretched up and down), so there is picture in every direction one can look through the window.
+    // The view outside a window: the inside of a sphere section around the player. The picture covers the middle and
+    // continues beyond its borders (mirrored sideways, bent over the viewer up and down, see SetDomeUvs), so there is
+    // picture in every direction one can look through the window.
     private const float DomeYaw = 120f, DomePitch = 88f; // half extents in degrees
     private Transform _dome;
     private Renderer _domeR;
     private Material _domeMat;
 
+    private const int DomeNx = 48, DomeNy = 64;
+    private Mesh _domeMesh;
+    private float _domeSpan, _domeAspect, _domeFill;
+
+    /// <summary>
+    /// Where the picture lies on the dome. Sideways it is angle-linear (and mirrored past its borders). Up and down it
+    /// is true to scale in the middle and is drawn out more and more towards its top / bottom edge, which lies at
+    /// <paramref name="fill"/> degrees: the picture bends over the viewer instead of ending at its natural height
+    /// with its last row of pixels smeared up to the pole.
+    /// </summary>
+    private void SetDomeUvs(float span, float aspect, float fill)
+    {
+        if (span == _domeSpan && aspect == _domeAspect && fill == _domeFill) return;
+        _domeSpan = span; _domeAspect = aspect; _domeFill = fill;
+        float vSpan = span * aspect;                          // the picture's natural height in degrees
+        fill = Mathf.Clamp(fill, vSpan * 0.5f, DomePitch);
+        float n = 2f * fill / vSpan;                          // 1 = natural height (no bend)
+        var uvs = new Vector2[(DomeNx + 1) * (DomeNy + 1)];
+        for (int y = 0, i = 0; y <= DomeNy; y++)
+        {
+            float pitch = Mathf.Lerp(-DomePitch, DomePitch, (float)y / DomeNy);
+            float k = Mathf.Min(Mathf.Abs(pitch) / fill, 1f);
+            float v = 0.5f + Mathf.Sign(pitch) * 0.5f * (1f - Mathf.Pow(1f - k, n));
+            for (int x = 0; x <= DomeNx; x++, i++)
+                uvs[i] = new Vector2(0.5f + Mathf.Lerp(-DomeYaw, DomeYaw, (float)x / DomeNx) / span, v);
+        }
+        _domeMesh.uv = uvs;
+    }
+
     private void BuildDome(Shader shader)
     {
-        const int nx = 48, ny = 32;
+        const int nx = DomeNx, ny = DomeNy;
         var verts = new Vector3[(nx + 1) * (ny + 1)];
-        var uvs = new Vector2[verts.Length];
         var tris = new int[nx * ny * 6];
         for (int y = 0, i = 0; y <= ny; y++)
             for (int x = 0; x <= nx; x++, i++)
@@ -89,7 +117,6 @@ internal sealed class FlatScreen
                 float cy = Mathf.Cos(yaw * Mathf.Deg2Rad), sy = Mathf.Sin(yaw * Mathf.Deg2Rad);
                 float cp = Mathf.Cos(pitch * Mathf.Deg2Rad), sp = Mathf.Sin(pitch * Mathf.Deg2Rad);
                 verts[i] = new Vector3(sy * cp, sp, cy * cp);
-                uvs[i] = new Vector2(yaw / 360f, pitch / 360f); // in turns; the material scales this to the picture's span
             }
         for (int y = 0, t = 0; y < ny; y++)
             for (int x = 0; x < nx; x++)
@@ -100,9 +127,9 @@ internal sealed class FlatScreen
             }
         var mesh = new Mesh { name = "NIVR Window Dome", hideFlags = HideFlags.HideAndDontSave };
         mesh.vertices = verts;
-        mesh.uv = uvs;
         mesh.triangles = tris;
         mesh.RecalculateBounds();
+        _domeMesh = mesh;
 
         var go = new GameObject("WindowDome");
         go.transform.SetParent(_root.transform, false);
@@ -211,8 +238,7 @@ internal sealed class FlatScreen
             _dome.SetPositionAndRotation(basePos, baseRot);
             _dome.localScale = Vector3.one * (pictureDistance * scale);
             _domeMat.mainTexture = room;
-            _domeMat.mainTextureScale = new Vector2(360f / span, 360f / (span * aspect));
-            _domeMat.mainTextureOffset = new Vector2(0.5f, 0.5f);
+            SetDomeUvs(span, aspect, VRConfig.WindowFillDegrees.Value);
             showPicture = false;
         }
         _domeR.enabled = dome;

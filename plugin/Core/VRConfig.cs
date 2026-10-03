@@ -42,6 +42,7 @@ public static class VRConfig
     public static ConfigEntry<bool> RoomEnclosure;
     public static ConfigEntry<bool> WindowDome;
     public static ConfigEntry<float> WindowViewDegrees;
+    public static ConfigEntry<float> WindowFillDegrees;
     public static ConfigEntry<float> RoomViewDegrees;
     public static ConfigEntry<bool> BodyFollowsHead;
     public static ConfigEntry<VRInteractionRay> InteractionRay;
@@ -127,7 +128,9 @@ public static class VRConfig
         WindowDistance = c.Bind("Rendering", "WindowDistance", 10f, "How far away the view outside a window is drawn, in metres.");
         WindowDome = c.Bind("Rendering", "WindowDome", true,
             "The view outside a window is drawn on a curved surface around you and continues (mirrored) past the picture's borders, so no angle through the window shows anything else. false = a flat picture.");
-        WindowViewDegrees = c.Bind("Rendering", "WindowViewDegrees", 110f, "How wide the window picture itself is on that surface, in degrees. Larger = bigger picture, more curvature.");
+        WindowViewDegrees = c.Bind("Rendering", "WindowViewDegrees", 130f, "How wide the window picture itself is on that surface, in degrees. Larger = bigger picture, more curvature.");
+        WindowFillDegrees = c.Bind("Rendering", "WindowFillDegrees", 70f,
+            "How far up and down the window picture reaches, in degrees from the horizon. The picture keeps its true proportions in the middle and is drawn out towards its top and bottom edge to reach this far. Smaller = less stretching, but its edge row is smeared over the rest sooner.");
         PeepholeEye = c.Bind("Rendering", "PeepholeEye", VRHand.Right, "Which eye looks through the door peephole; the other eye is black.");
         PeepholeFov = c.Bind("Rendering", "PeepholeDegrees", 60f, "Width of the peephole picture in degrees (it stays still in front of you; the whole picture should fit in view).");
         ControllerAsGamepad = c.Bind("Input", "ControllerAsGamepad", true,

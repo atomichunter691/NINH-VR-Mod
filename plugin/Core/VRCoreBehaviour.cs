@@ -207,9 +207,9 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             VrSettings.Tick();
             KeepEventSystemFocused();
             PauseGuard.Tick(_focused && !controlsCard);
-            _pointer.PrePress(_focused && !controlsCard ? InputMode : VRInputMode.Walk);
+            _pointer.PrePress(_focused && !controlsCard ? InputMode : VRInputMode.Walk, _flatScreen);
             _gamepad.Tick(_focused && !controlsCard, InputMode != VRInputMode.Gamepad, InputMode == VRInputMode.Pointer && UiPointer.ControllersPresent && UiPointer.MouseScheme,
-                GameState.Top == _Code.Player.EWatcherState.Radio, _pointer.HandSide);
+                TriggerRole(InputMode, state), _pointer.HandSide);
             if (_focused && !controlsCard) _pointer.Tick(InputMode, _flatScreen, _gamepad, _headT);
             else _pointer.Restore();
             if (_focused && !controlsCard && InputMode == VRInputMode.Walk) HandleSnapTurn(); // elsewhere the right stick is the radio knob / scroll
@@ -471,6 +471,19 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                 return Cursor.lockState == CursorLockMode.Locked ? VRInputMode.Walk : VRInputMode.Pointer;
             default:                                   // rooms, dialogs, phone, fridge, menus
                 return VRInputMode.Pointer;
+        }
+    }
+
+    private static VRTriggerRole TriggerRole(VRInputMode mode, _Code.Player.EWatcherState? state)
+    {
+        if (mode == VRInputMode.Pointer) return VRTriggerRole.Pointer;
+        if (mode == VRInputMode.Walk) return VRTriggerRole.South;
+        switch (state)
+        {
+            case _Code.Player.EWatcherState.Radio: return VRTriggerRole.Knob;
+            case _Code.Player.EWatcherState.Window:
+            case _Code.Player.EWatcherState.Peephole: return VRTriggerRole.West;
+            default: return VRTriggerRole.Hands;
         }
     }
 
