@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Development-only helpers (log mirror, screenshots, scene dumps, command channel).
+       Not part of the release package. -->
+  <PropertyGroup>
+    <AssemblyName>NIVR.DevTools</AssemblyName>
+    <RootNamespace>NIVR.DevTools</RootNamespace>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>

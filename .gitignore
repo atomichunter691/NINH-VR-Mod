@@ -1,0 +1,17 @@
+# Never commit game files, decompiled game code, saves or local tooling.
+/game_copy/
+/recon/
+/backup/
+/logs/
+/tools/
+/release/
+/NINH VR Mod/
+
+# Build output
+bin/
+obj/
+*.user
+.vs/
+
+# Local agent / editor state
+.claude/

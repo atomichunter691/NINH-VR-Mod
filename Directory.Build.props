@@ -1,0 +1,41 @@
+<Project>
+  <!-- Shared settings for every NIVR plugin project under C:\VRMod\src\.
+       GameDir is the BepInEx-patched working copy (never the Steam install).
+       Override with: dotnet build -p:GameDir=D:\some\other\copy -->
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">C:\VRMod\game_copy</GameDir>
+    <BepInExDir>$(GameDir)\BepInEx</BepInExDir>
+    <PluginDeployDir>$(BepInExDir)\plugins\NIVR</PluginDeployDir>
+
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <DebugType>embedded</DebugType>
+    <NoWarn>$(NoWarn);CS0436;MSB3277;MSB3243</NoWarn>
+  </PropertyGroup>
+
+  <!-- Reference BepInEx + the Il2CppInterop assemblies generated from the user's own
+       copy of the game. Private=false: none of these are ever copied into our output,
+       so no game code ends up in the release package. -->
+  <ItemGroup>
+    <Reference Include="$(BepInExDir)\core\BepInEx.Core.dll" Private="false" />
+    <Reference Include="$(BepInExDir)\core\BepInEx.Unity.Common.dll" Private="false" />
+    <Reference Include="$(BepInExDir)\core\BepInEx.Unity.IL2CPP.dll" Private="false" />
+    <Reference Include="$(BepInExDir)\core\Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="$(BepInExDir)\core\Il2CppInterop.Common.dll" Private="false" />
+    <Reference Include="$(BepInExDir)\core\0Harmony.dll" Private="false" />
+    <Reference Include="$(BepInExDir)\interop\*.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- Auto-deploy: every successful build copies the plugin dll into the game copy. -->
+  <Target Name="DeployPlugin" AfterTargets="Build" Condition="Exists('$(BepInExDir)')">
+    <MakeDir Directories="$(PluginDeployDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginDeployDir)" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) -> $(PluginDeployDir)" />
+  </Target>
+</Project>

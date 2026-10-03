@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The actual VR mod. This is the only dll that goes in the release package. -->
+  <PropertyGroup>
+    <AssemblyName>NIVR.Plugin</AssemblyName>
+    <RootNamespace>NIVR</RootNamespace>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>

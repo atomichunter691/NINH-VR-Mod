@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- VR core: OpenXR session, stereo rendering, head tracking, VRRig API.
+       Shared settings (target framework, references, deploy of the dll) come from C:\VRMod\Directory.Build.props.
+       Other modules reference this project (or the built NIVR.Core.dll) and use the NIVR.Core.VRRig API. -->
+  <PropertyGroup>
+    <AssemblyName>NIVR.Core</AssemblyName>
+    <RootNamespace>NIVR.Core</RootNamespace>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+
+  <!-- Khronos OpenXR loader (Apache-2.0, redistributable). Not a game file. -->
+  <Target Name="DeployOpenXRLoader" AfterTargets="Build" Condition="Exists('$(BepInExDir)')">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\lib\openxr_loader.dll" DestinationFolder="$(PluginDeployDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
