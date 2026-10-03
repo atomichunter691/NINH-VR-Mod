@@ -841,3 +841,30 @@ and SteamVR restart recovery need hardware verification. Right Menu is runtime-d
 Final state: game stopped, Backend=Auto, Snap=30, test comfort/HUD/crouch options reset, ControlsCardSeen=false so the
 user gets the first-run card. SaveSandbox remains true; existing local debug preferences are preserved. Release contains
 no cfg and defaults to CommandDir empty / Verbose false.
+
+### 2.15 Settings / pause fixes after the 0.2.0 headset test - 2026-10-02
+
+User: settings menu "does not behave like the rest of the UI", settings could not be changed, and after leaving the
+player could no longer move, look or interact. Simulator-verified only (no headset); the real cause of the first
+complaint is **not proven** (see below). Everything here is in `plugin/Core`.
+
+* **Reproduced (sim): B on the bare pause screen traps the game.** After B the cursor is re-locked but the pause
+  screen stays; a following "Continue" click leaves `InputHandling._inUiCounter` at 2 with `top=Pause`, and Menu no
+  longer closes it, so walk / look / interact are dead. `PauseGuard.cs`: B is not sent to the game while the pause
+  screen itself is on top (Settings and sub-screens still get B); Menu on the pause screen that the game ignores for
+  0.7 s closes it via `PauseMenuView.Switch(false)`; a stale `Pause` watcher state or a UI counter stuck above zero in
+  the hallway for 2.5 s is cleared (`trap` debug command raises the counter to test; recovery verified, walking works after).
+* **Menu buttons now get a direct submit** (`UiPointer.PrePress`): a trigger press on the Selectable under the laser
+  calls its `ISubmitHandler.OnSubmit` and the gamepad A for that press is withheld (`UiPointer.SwallowTrigger`). The old
+  path (selection set by the laser + A through the EventSystem) failed twice in the sim for no proven reason (window
+  focus is the suspect: the EventSystem only runs with focus). Also `KeepEventSystemFocused` calls
+  `EventSystem.OnApplicationFocus(true)` when it reports no focus (logs once). Each direct click is logged
+  (`VR UI click -> <name>`), so a headset log shows whether menus are hit.
+* **Main menu is pointer mode** while its UI is up (no watcher state, `_inUiCounter > 0`): before, a gamepad-locked
+  cursor made it "walk" mode with no laser.
+* **Right stick scrolls the list under the laser** (`UiPointer.ScrollUnderPointer`) so the VR section at the end of
+  Settings can be reached with the laser alone (left stick navigation already scrolled).
+* Debug: `trace [off]` logs the virtual A press / game submit per frame, `trap`, `game` now prints `appFocus/esFocus`.
+* Sim facts learned: `focus lost` + the Menu button both open the same pause; B in Settings goes back to Pause (fine);
+  `pad ... for` works for B (32) / A (64) but the physical-button sim command is `btn r secondary` / `trigger r s`.
+  The release build still has `CommandDir` empty.

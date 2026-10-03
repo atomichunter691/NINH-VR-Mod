@@ -119,6 +119,29 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
 
     // ------------------------------------------------------------------ Update
 
+    private static bool s_loggedEsFocus;
+    // The EventSystem only processes submit / navigation while the game window is focused, and with a headset on it
+    // rarely is. Tell it it has focus.
+    private static void KeepEventSystemFocused()
+    {
+        var es = UnityEngine.EventSystems.EventSystem.current;
+        if (es == null || es.isFocused) return;
+        if (!s_loggedEsFocus) { s_loggedEsFocus = true; CorePlugin.Log.LogInfo("EventSystem reports no window focus; forcing it so menus keep working in the headset."); }
+        es.OnApplicationFocus(true);
+    }
+
+    internal static bool TraceSubmit;
+    private void TraceSubmitState()
+    {
+        var gp = _gamepad.Device != null ? _gamepad.Device.TryCast<Gamepad>() : null;
+        var ih = GameState.Input;
+        bool south = gp != null && gp.buttonSouth.isPressed;
+        bool clicked = ih != null && (ih.UISubmitClicked || ih.UISubmitDown);
+        if (!south && !clicked) return;
+        var es = UnityEngine.EventSystems.EventSystem.current;
+        CorePlugin.Log.LogInfo($"TRACE f={Time.frameCount} south={south} uiSubmit={clicked} sel={(es != null && es.currentSelectedGameObject != null ? es.currentSelectedGameObject.name : "none")} scheme={(ih != null && ih._playerInput != null ? ih._playerInput.currentActionMap?.name : "?")} focus={Application.isFocused}/{(es != null ? es.isFocused : false)}");
+    }
+
     private void Update()
     {
         try
@@ -179,6 +202,9 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             InputMode = mode;
             bool controlsCard = _controlsCard.Tick();
             VrSettings.Tick();
+            KeepEventSystemFocused();
+            PauseGuard.Tick(_focused && !controlsCard);
+            _pointer.PrePress(_focused && !controlsCard ? InputMode : VRInputMode.Walk);
             _gamepad.Tick(_focused && !controlsCard, InputMode == VRInputMode.Walk, InputMode == VRInputMode.Pointer && UiPointer.ControllersPresent && UiPointer.MouseScheme,
                 GameState.Top == _Code.Player.EWatcherState.Radio, _pointer.HandSide);
             if (_focused && !controlsCard) _pointer.Tick(InputMode, _flatScreen, _gamepad, _headT);
@@ -187,6 +213,7 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             HandlePhysicalCrouch(_focused && !controlsCard && InputMode == VRInputMode.Walk);
             Comfort.Tick();
             VRRig.RaiseButtons();
+            if (TraceSubmit) TraceSubmitState();
         }
         catch (Exception e)
         {
@@ -435,6 +462,9 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             case _Code.Player.EWatcherState.Dream:
                 return VRInputMode.Gamepad;
             case null:
+                // No watcher: the main menu (a gamepad keeps the cursor locked there) counts as pointer while its UI is up.
+                var ui = GameState.Input;
+                if (ui != null && ui._inUiCounter > 0) return VRInputMode.Pointer;
                 return Cursor.lockState == CursorLockMode.Locked ? VRInputMode.Walk : VRInputMode.Pointer;
             default:                                   // rooms, dialogs, phone, fridge, menus
                 return VRInputMode.Pointer;
@@ -1093,6 +1123,8 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                 if (p[2] == "off") { _simHand[sh] = null; break; }
                 _simHand[sh] = (new Vector3(F(p[2]), F(p[3]), F(p[4])), Quaternion.Euler(F(p[6]), F(p[5]), 0f), p.Length > 7 ? F(p[7]) : 0f);
                 break;
+            case "trap": PauseGuard.DebugTrap(); break;
+            case "trace": TraceSubmit = p.Length < 2 || p[1] != "off"; break;
             case "game":
                 CorePlugin.Log.LogInfo("game: " + GameState.Describe() + $" mode={InputMode}");
                 UiPointer.DebugHover = true;

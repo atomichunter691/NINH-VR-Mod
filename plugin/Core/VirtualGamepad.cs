@@ -61,6 +61,8 @@ internal sealed unsafe class VirtualGamepad
     private float _twistDetent;
     private bool _submitHeld;
     public static bool DebugNavigating { get; private set; }
+    /// <summary>The right stick as the game sees it before any zeroing (debug override included).</summary>
+    public static Vector2 RightStickValue { get; private set; }
 
     /// <param name="zeroRightStick">the right stick is snap turn (hallway)</param>
     /// <param name="silent">the controllers drive the virtual mouse / keyboard instead (pointer mode)</param>
@@ -93,6 +95,7 @@ internal sealed unsafe class VirtualGamepad
             }
 
             var e = new GamepadStateEvent { leftStick = DebugLeftStick ?? l.Stick, rightStick = DebugRightStick ?? r.Stick };
+            RightStickValue = e.rightStick;
             DebugNavigating = debug && (e.leftStick.sqrMagnitude > 0.25f || e.rightStick.sqrMagnitude > 0.25f);
             // Walking the hallway: the right stick is snap turn only (the game's look is switched off anyway).
             if (zeroRightStick && !DebugRightStick.HasValue) e.rightStick = Vector2.zero;
@@ -120,7 +123,7 @@ internal sealed unsafe class VirtualGamepad
             }
             else _twisting = false;
             uint b = DebugButtons;
-            if (ButtonGate.Down(r, VRButton.Primary) || (!twist && ButtonGate.Down(p, VRButton.Trigger))) b |= South;
+            if (ButtonGate.Down(r, VRButton.Primary) || (!twist && !UiPointer.SwallowTrigger && ButtonGate.Down(p, VRButton.Trigger))) b |= South;
             if (ButtonGate.Down(r, VRButton.Secondary)) b |= East;
             if (ButtonGate.Down(l, VRButton.Primary) || (!knobTwist && ButtonGate.Down(o, VRButton.Trigger))) b |= West;
             if (ButtonGate.Down(l, VRButton.Secondary)) b |= North;
@@ -129,6 +132,7 @@ internal sealed unsafe class VirtualGamepad
             if (ButtonGate.Down(r, VRButton.Stick)) b |= RightStick;
             if (ButtonGate.Down(l, VRButton.Grip)) b |= LeftShoulder;
             if (ButtonGate.Down(r, VRButton.Grip)) b |= RightShoulder;
+            if (PauseGuard.SwallowEast) b &= ~East;
             e.buttons = b;
             bool submit = (b & South) != 0;
             if (submit && !_submitHeld) Haptics.Tick(pointerHand, "submit", 0.4f, 0.04f);

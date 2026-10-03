@@ -84,6 +84,10 @@ internal sealed unsafe class UiPointer
     private UnityEngine.EventSystems.PointerEventData _ped;
     private Il2CppSystem.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult> _hits;
     private int _lastHoveredSelectable;
+    private UnityEngine.UI.Selectable _hoverSel;
+    private bool _trigPrev, _swallow;
+    /// <summary>The pointing hand's trigger click was delivered straight to the button under the laser; do not also send A.</summary>
+    public static bool SwallowTrigger { get; private set; }
     private bool _navOverride;
 
     // Gamepad menus act on the selected button (A = submit). The button under the laser becomes the selection when
@@ -119,6 +123,8 @@ internal sealed unsafe class UiPointer
             sb.Append($" sel={(sel != null ? sel.name : "none")} current={(es.currentSelectedGameObject != null ? es.currentSelectedGameObject.name : "none")}");
             HoverInfo = sb.ToString();
         }
+        _hoverSel = sel;
+        ScrollUnderPointer();
         int id = sel != null ? sel.GetInstanceID() : 0;
         if (id != _lastHoveredSelectable) { _lastHoveredSelectable = id; _navOverride = false; if (id != 0) Haptics.Tick(HandSide, "hover"); }
         // Stick / d-pad navigation takes over until the laser moves to another button.
@@ -141,6 +147,61 @@ internal sealed unsafe class UiPointer
                 slider.normalizedValue = value;
             }
         }
+    }
+
+    /// <summary>
+    /// Before the virtual gamepad is fed: a trigger press on a button under the laser is delivered to that button
+    /// directly (its own submit handler) instead of as gamepad A. A goes through the EventSystem, which needs the game
+    /// window to have focus and the laser's selection to survive the frame; a direct submit does not.
+    /// </summary>
+    public void PrePress(VRInputMode mode)
+    {
+        SwallowTrigger = false;
+        bool on = mode == VRInputMode.Pointer && !MouseScheme && ControllersPresent && !_failed;
+        if (!on) { _trigPrev = _swallow = false; return; }
+        bool trig = ButtonGate.Down(VRRig.Controller(HandSide), VRButton.Trigger);
+        if (trig && !_trigPrev && _hoverSel != null)
+        {
+            try
+            {
+                var sel = _hoverSel;
+                if (sel != null && sel.IsActive() && sel.IsInteractable() && sel.TryCast<UnityEngine.UI.Slider>() == null)
+                {
+                    var es = UnityEngine.EventSystems.EventSystem.current;
+                    var submit = sel.TryCast<UnityEngine.EventSystems.ISubmitHandler>();
+                    if (es != null && submit != null)
+                    {
+                        if (es.currentSelectedGameObject != sel.gameObject) es.SetSelectedGameObject(sel.gameObject);
+                        submit.OnSubmit(new UnityEngine.EventSystems.BaseEventData(es));
+                        _swallow = true;
+                        Haptics.Tick(HandSide, "submit", 0.4f, 0.04f);
+                        CorePlugin.Log.LogInfo($"VR UI click -> {sel.name} ({sel.GetIl2CppType().Name}) focus={Application.isFocused}/{es.isFocused}");
+                    }
+                }
+            }
+            catch (Exception e) { _swallow = false; CorePlugin.LogThrottled("direct-submit", "Direct UI click failed, using gamepad A instead: " + e.Message); }
+        }
+        if (!trig) _swallow = false;
+        _trigPrev = trig;
+        SwallowTrigger = _swallow;
+    }
+
+    // Right stick scrolls the list under the laser (the game's own scroll follows the gamepad cursor, which the laser owns).
+    private void ScrollUnderPointer()
+    {
+        float sy = VirtualGamepad.RightStickValue.y;
+        if (Mathf.Abs(sy) < 0.3f) return;
+        UnityEngine.UI.ScrollRect scroll = null;
+        for (int i = 0; i < _hits.Count && scroll == null; i++)
+        {
+            var go = _hits[i].gameObject;
+            if (go != null) scroll = go.GetComponentInParent<UnityEngine.UI.ScrollRect>();
+        }
+        if (scroll == null || scroll.content == null || scroll.viewport == null) return;
+        float range = scroll.content.rect.height - scroll.viewport.rect.height;
+        if (range < 1f) return;
+        scroll.StopMovement();
+        scroll.verticalNormalizedPosition = Mathf.Clamp01(scroll.verticalNormalizedPosition + sy * 1100f * Mathf.Min(Time.unscaledDeltaTime, 0.05f) / range);
     }
 
     private int _lastCurrentId, _selectionChanges, _selectionSets;

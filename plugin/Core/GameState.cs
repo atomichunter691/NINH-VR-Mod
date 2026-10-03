@@ -63,6 +63,8 @@ internal static class GameState
             }
             var m = Mouse.current;
             if (m != null) s += $" mouse=({m.position.ReadValue().x:F0},{m.position.ReadValue().y:F0}) lmb={m.leftButton.isPressed}";
+            var cur = UnityEngine.EventSystems.EventSystem.current;
+            s += $" appFocus={Application.isFocused} esFocus={(cur != null && cur.isFocused)}";
             s += $" cursor={Cursor.lockState}/{(Cursor.visible ? "visible" : "hidden")}";
             try { var lp = UnityEngine.Input.mousePosition; s += $" legacyMouse=({lp.x:F0},{lp.y:F0})"; }
             catch (Exception) { s += " legacyMouse=disabled"; }
