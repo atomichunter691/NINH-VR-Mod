@@ -40,7 +40,8 @@ Windows PC that owns the game. Those assemblies are never committed or shipped.
    `release\NIVR-<version>.zip` containing only the plugin DLL, the OpenXR loader, its license and the README.
 
 `src/NIVR.DevTools` is a development-only plugin (logging, screenshots, scene dumps, save sandbox) and is never
-included in releases. See [RELEASING.md](RELEASING.md) for how to publish a new version.
+included in releases. See [RELEASING.md](RELEASING.md) for how to publish a new version, and
+[docs/DEV_NOTES.md](docs/DEV_NOTES.md) for the development notes on how the mod works.
 
 ## Legal
 
