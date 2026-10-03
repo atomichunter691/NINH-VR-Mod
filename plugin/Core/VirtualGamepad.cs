@@ -64,7 +64,7 @@ internal sealed unsafe class VirtualGamepad
     /// <summary>The right stick as the game sees it before any zeroing (debug override included).</summary>
     public static Vector2 RightStickValue { get; private set; }
 
-    /// <param name="zeroRightStick">the right stick is snap turn (hallway)</param>
+    /// <param name="zeroRightStick">the right stick is ours: snap turn (hallway) or scrolling the list under the laser (pointer screens)</param>
     /// <param name="silent">the controllers drive the virtual mouse / keyboard instead (pointer mode)</param>
     /// <param name="knobTwist">radio: trigger + twist turns the knob</param>
     /// <param name="pointerHand">its trigger is A (interact); the other trigger is X (skip dialog line)</param>
@@ -96,7 +96,7 @@ internal sealed unsafe class VirtualGamepad
 
             var e = new GamepadStateEvent { leftStick = DebugLeftStick ?? l.Stick, rightStick = DebugRightStick ?? r.Stick };
             RightStickValue = e.rightStick;
-            DebugNavigating = debug && (e.leftStick.sqrMagnitude > 0.25f || e.rightStick.sqrMagnitude > 0.25f);
+            DebugNavigating = debug && e.leftStick.sqrMagnitude > 0.25f;
             // Walking the hallway: the right stick is snap turn only (the game's look is switched off anyway).
             if (zeroRightStick && !DebugRightStick.HasValue) e.rightStick = Vector2.zero;
             var p = VRRig.Controller(pointerHand); var o = VRRig.Controller(pointerHand == VRHand.Right ? VRHand.Left : VRHand.Right);
@@ -123,8 +123,8 @@ internal sealed unsafe class VirtualGamepad
             }
             else _twisting = false;
             uint b = DebugButtons;
-            if (ButtonGate.Down(r, VRButton.Primary) || (!twist && !UiPointer.SwallowTrigger && ButtonGate.Down(p, VRButton.Trigger))) b |= South;
-            if (ButtonGate.Down(r, VRButton.Secondary)) b |= East;
+            if (!UiPointer.SwallowTrigger && (ButtonGate.Down(r, VRButton.Primary) || (!twist && ButtonGate.Down(p, VRButton.Trigger)))) b |= South;
+            if (ButtonGate.Down(r, VRButton.Secondary) && !PauseGuard.SwallowEast) b |= East;
             if (ButtonGate.Down(l, VRButton.Primary) || (!knobTwist && ButtonGate.Down(o, VRButton.Trigger))) b |= West;
             if (ButtonGate.Down(l, VRButton.Secondary)) b |= North;
             if (ButtonGate.Down(l, VRButton.Menu)) b |= Start;

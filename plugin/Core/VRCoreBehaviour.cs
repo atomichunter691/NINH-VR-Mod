@@ -137,6 +137,9 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
         var ih = GameState.Input;
         bool south = gp != null && gp.buttonSouth.isPressed;
         bool clicked = ih != null && (ih.UISubmitClicked || ih.UISubmitDown);
+        bool east = gp != null && gp.buttonEast.isPressed;
+        if (east || (ih != null && (ih.UIExitTriggered || ih.UICancelClicked)))
+            CorePlugin.Log.LogInfo($"TRACE f={Time.frameCount} east={east} uiExit={ih?.UIExitTriggered} uiExitReleased={ih?.UIExitReleased} uiCancel={ih?.UICancelClicked} map={ih?._playerInput?.currentActionMap?.name}");
         if (!south && !clicked) return;
         var es = UnityEngine.EventSystems.EventSystem.current;
         CorePlugin.Log.LogInfo($"TRACE f={Time.frameCount} south={south} uiSubmit={clicked} sel={(es != null && es.currentSelectedGameObject != null ? es.currentSelectedGameObject.name : "none")} scheme={(ih != null && ih._playerInput != null ? ih._playerInput.currentActionMap?.name : "?")} focus={Application.isFocused}/{(es != null ? es.isFocused : false)}");
@@ -205,7 +208,7 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             KeepEventSystemFocused();
             PauseGuard.Tick(_focused && !controlsCard);
             _pointer.PrePress(_focused && !controlsCard ? InputMode : VRInputMode.Walk);
-            _gamepad.Tick(_focused && !controlsCard, InputMode == VRInputMode.Walk, InputMode == VRInputMode.Pointer && UiPointer.ControllersPresent && UiPointer.MouseScheme,
+            _gamepad.Tick(_focused && !controlsCard, InputMode != VRInputMode.Gamepad, InputMode == VRInputMode.Pointer && UiPointer.ControllersPresent && UiPointer.MouseScheme,
                 GameState.Top == _Code.Player.EWatcherState.Radio, _pointer.HandSide);
             if (_focused && !controlsCard) _pointer.Tick(InputMode, _flatScreen, _gamepad, _headT);
             else _pointer.Restore();
@@ -861,6 +864,8 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
         // Same size as the window, so the canvases attached to this camera keep their layout. The camera keeps
         // rendering on its own; the eye shows the previous frame's picture.
         if (_peepCam.targetTexture != _peepRT) _peepCam.targetTexture = _peepRT;
+        // The laser, controller markers and the picture quad itself live on the VR-only layer: keep them out of the picture.
+        if ((_peepCam.cullingMask & (1 << PeepLayer)) != 0) _peepCam.cullingMask &= ~(1 << PeepLayer);
         return true;
     }
 
@@ -1124,6 +1129,10 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                 _simHand[sh] = (new Vector3(F(p[2]), F(p[3]), F(p[4])), Quaternion.Euler(F(p[6]), F(p[5]), 0f), p.Length > 7 ? F(p[7]) : 0f);
                 break;
             case "trap": PauseGuard.DebugTrap(); break;
+            case "leave":
+                foreach (var lv in Resources.FindObjectsOfTypeAll<_Code.Infrastructure.ActionableObjects.AActionableObjectView>())
+                    if (lv != null && lv.gameObject.scene.IsValid() && lv.IsLooking) { CorePlugin.Log.LogInfo($"TryLeave on {lv.name} canLeave={lv.CanLeave} animating={lv._isAnimating}"); lv.TryLeave(); }
+                break;
             case "trace": TraceSubmit = p.Length < 2 || p[1] != "off"; break;
             case "game":
                 CorePlugin.Log.LogInfo("game: " + GameState.Describe() + $" mode={InputMode}");

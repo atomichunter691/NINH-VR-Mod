@@ -89,6 +89,10 @@ internal sealed unsafe class UiPointer
     /// <summary>The pointing hand's trigger click was delivered straight to the button under the laser; do not also send A.</summary>
     public static bool SwallowTrigger { get; private set; }
     private bool _navOverride;
+    private Vector2 _navPx;
+    private const float NavReleasePixels = 70f;
+    /// <summary>True while the laser (not the stick) is changing the selection.</summary>
+    public static bool LaserSelecting { get; private set; }
 
     // Gamepad menus act on the selected button (A = submit). The button under the laser becomes the selection when
     // the laser moves onto it; stick / d-pad navigation keeps working until the laser moves to another button.
@@ -126,11 +130,20 @@ internal sealed unsafe class UiPointer
         _hoverSel = sel;
         ScrollUnderPointer();
         int id = sel != null ? sel.GetInstanceID() : 0;
-        if (id != _lastHoveredSelectable) { _lastHoveredSelectable = id; _navOverride = false; if (id != 0) Haptics.Tick(HandSide, "hover"); }
-        // Stick / d-pad navigation takes over until the laser moves to another button.
-        if (VRRig.LeftController.Stick.sqrMagnitude > 0.25f || VRRig.RightController.Stick.sqrMagnitude > 0.25f || VirtualGamepad.DebugNavigating) _navOverride = true;
+        // Stick navigation owns the selection until the laser is deliberately moved away from where it rested
+        // (a hand never holds the laser still; jitter across a button edge must not snatch the selection back).
+        if (VRRig.LeftController.Stick.sqrMagnitude > 0.25f || VirtualGamepad.DebugNavigating) { _navOverride = true; _navPx = px; }
+        else if (_navOverride && (px - _navPx).sqrMagnitude > NavReleasePixels * NavReleasePixels) _navOverride = false;
+        if (id != _lastHoveredSelectable) { _lastHoveredSelectable = id; if (id != 0 && !_navOverride) Haptics.Tick(HandSide, "hover"); }
         // Kept every frame: the game re-asserts its own gamepad selection.
-        if (sel != null && !_navOverride && es.currentSelectedGameObject != sel.gameObject) { es.SetSelectedGameObject(sel.gameObject); _selectionSets++; }
+        if (sel != null && !_navOverride && es.currentSelectedGameObject != sel.gameObject)
+        {
+            // Selecting by laser must not scroll the list (the item is already under the laser; scrolling would put
+            // another item there, which would be selected and scrolled in turn).
+            LaserSelecting = true;
+            try { es.SetSelectedGameObject(sel.gameObject); } finally { LaserSelecting = false; }
+            _selectionSets++;
+        }
         // Sliders need a value change as well as selection when the laser is clicked or held.
         var slider = sel != null ? sel.TryCast<UnityEngine.UI.Slider>() : null;
         if (slider != null && !_navOverride && ButtonsDown(Hand))
@@ -159,12 +172,16 @@ internal sealed unsafe class UiPointer
         SwallowTrigger = false;
         bool on = mode == VRInputMode.Pointer && !MouseScheme && ControllersPresent && !_failed;
         if (!on) { _trigPrev = _swallow = false; return; }
-        bool trig = ButtonGate.Down(VRRig.Controller(HandSide), VRButton.Trigger);
-        if (trig && !_trigPrev && _hoverSel != null)
+        bool trig = ButtonGate.Down(VRRig.Controller(HandSide), VRButton.Trigger) || ButtonGate.Down(VRRig.RightController, VRButton.Primary);
+        if (trig && !_trigPrev)
         {
             try
             {
-                var sel = _hoverSel;
+                // The button under the laser, or (stick navigation / laser off the buttons) the selected one.
+                var sel = _navOverride ? null : _hoverSel;
+                var esNow = UnityEngine.EventSystems.EventSystem.current;
+                if (sel == null && esNow != null && esNow.currentSelectedGameObject != null)
+                    sel = esNow.currentSelectedGameObject.GetComponent<UnityEngine.UI.Selectable>();
                 if (sel != null && sel.IsActive() && sel.IsInteractable() && sel.TryCast<UnityEngine.UI.Slider>() == null)
                 {
                     var es = UnityEngine.EventSystems.EventSystem.current;

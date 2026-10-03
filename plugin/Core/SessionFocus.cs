@@ -14,7 +14,7 @@ internal static class SessionFocus
             foreach (var view in Resources.FindObjectsOfTypeAll<PauseMenuView>())
             {
                 if (view == null || !view.gameObject.scene.IsValid() || view._inputHandler == null) continue;
-                if (!view.IsPaused && !view.IsChanging) { view.Switch(true); CorePlugin.Log.LogInfo("Headset focus lost: opened game's pause menu (resume manually)."); }
+                if (!view.IsPaused && !view.IsChanging) { PauseGuard.Toggle(view); CorePlugin.Log.LogInfo("Headset focus lost: opened game's pause menu (resume manually)."); }
                 return;
             }
         }

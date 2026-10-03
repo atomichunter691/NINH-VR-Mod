@@ -868,3 +868,28 @@ complaint is **not proven** (see below). Everything here is in `plugin/Core`.
 * Sim facts learned: `focus lost` + the Menu button both open the same pause; B in Settings goes back to Pause (fine);
   `pad ... for` works for B (32) / A (64) but the physical-button sim command is `btn r secondary` / `trigger r s`.
   The release build still has `CommandDir` empty.
+
+### 2.16 Second settings / exit pass after headset feedback - 2026-10-02
+
+User (headset, after 2.15): menu selection still jumps (laser and stick fighting); cannot exit with the controller
+buttons; "two select lines" in the peephole dialogue and option presses unreliable; a window can only be left after
+backing up. All fixes **simulator-verified only**.
+
+* **Exit with B is done by the mod** (`PauseGuard.Exit`, on the B press edge; B is then withheld from the game):
+  active Settings page -> its `Back` button; pause screen -> resume; Window / Peephole state -> `TryLeave()` on the
+  looking `AActionableObjectView`. Verified cause for windows: the game receives B (`UIExitTriggered` true, "Exit (B)"
+  prompt shown, `_canLeave` true) and still does not leave, while `TryLeave()` leaves at once. While the window
+  narration runs (`CanLeave` false, prompts "Listen X / Respond A") nothing leaves - game rule, left alone.
+* **Never open/close pause with `PauseMenuView.Switch` alone**: afterwards `Act()` on doors / windows / peephole does
+  nothing (PauseController out of step). `PauseGuard.Toggle` uses `PauseController.SwitchPause()` (reached through
+  `AActionableObjectView.PauseController`); `SessionFocus` uses it too. 2.15's Menu fallback had this bug.
+* **Peephole "two lines"**: the peephole camera rendered layer 29 (laser, controller markers, its own picture quad)
+  into the picture, so a second, offset laser showed inside it. Layer 29 is now removed from its culling mask.
+* **Laser vs stick**: selecting by laser no longer scrolls the list (`UiPointer.LaserSelecting` skips the native
+  `OnItemSelected` and our `EnsureVisible`; that scroll put a new row under the laser, which was selected and scrolled
+  again). After left-stick navigation the laser only takes the selection back once it has moved 70 px. The right stick
+  is no longer sent to the game in pointer screens (it scrolls the list under the laser; the game's own scroll and
+  gamepad cursor used it as well).
+* **A and trigger both click directly**: the button under the laser, else the selected one (`UiPointer.PrePress`).
+* Debug: `leave` (TryLeave on the looking view), `trace` also logs B. Sim: visitor dialogue is reachable with `act 1`
+  (peephole) + X twice; window narration ends after X three times.

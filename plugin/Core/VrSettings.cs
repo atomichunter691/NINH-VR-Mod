@@ -37,6 +37,7 @@ internal static class VrSettings
     }
     private static bool NativeSelectionPrefix(SettingsInstance __instance)
     {
+        if (UiPointer.LaserSelecting) return false; // the laser is already on the item: no scrolling
         var es = __instance._eventSystem;
         var go = es != null ? es.currentSelectedGameObject : null;
         for (var t = go != null ? go.transform : null; t != null; t = t.parent)
@@ -148,7 +149,7 @@ internal static class VrSettings
         if (selectable.GetComponent<SettingsMarker>() == null) selectable.gameObject.AddComponent<SettingsMarker>();
         var ui = selectable.GetComponent<UISelectable>() ?? selectable.gameObject.AddComponent<UISelectable>();
         ui.Selected = (Il2CppSystem.Action<UnityEngine.EventSystems.BaseEventData>)new Action<UnityEngine.EventSystems.BaseEventData>(e =>
-        { try { EnsureVisible(page, selectable); } catch (Exception ex) { CorePlugin.LogThrottled("vr-scroll", "VR settings scroll: " + ex.Message); } });
+        { try { if (!UiPointer.LaserSelecting) EnsureVisible(page, selectable); } catch (Exception ex) { CorePlugin.LogThrottled("vr-scroll", "VR settings scroll: " + ex.Message); } });
         page.Selectables.Add(selectable);
     }
     private static void EnsureVisible(Page page, Selectable selectable)
