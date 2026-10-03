@@ -1,4 +1,4 @@
-# NIVR 0.2.0 — No, I'm not a Human VR mod
+# NIVR 0.2.1 — No, I'm not a Human VR mod
 
 For the Windows x64 Steam game version 1.3.19 (Unity 6000.3.10f1). Tested with Quest through Virtual Desktop and SteamVR OpenXR for the original VR core; the 0.2.0 polish features have simulator verification and still need headset testing.
 

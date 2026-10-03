@@ -11,7 +11,7 @@ public class CorePlugin : BasePlugin
 {
     public const string Guid = "nivr.core";
     public const string Name = "NIVR Core";
-    public const string Version = "0.2.0";
+    public const string Version = "0.2.1";
 
     internal static new ManualLogSource Log;
     private static readonly Dictionary<string, DateTime> s_throttle = new();

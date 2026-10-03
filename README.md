@@ -7,7 +7,7 @@ the game's own Settings screen.
 It is a [BepInEx 6](https://github.com/BepInEx/BepInEx) IL2CPP plugin. It contains no game code or assets; everything
 it needs from the game is loaded from your own install at runtime.
 
-> **Status: 0.2.0 preview.** The core VR experience has been played on a Quest (Virtual Desktop → SteamVR OpenXR).
+> **Status: 0.2.1 preview.** The core VR experience has been played on a Quest (Virtual Desktop → SteamVR OpenXR).
 > Some 0.2.0 polish features (comfort fades, haptics, focus/restart recovery) still need wider headset testing.
 > Bug reports are welcome in [Issues](../../issues).
 
