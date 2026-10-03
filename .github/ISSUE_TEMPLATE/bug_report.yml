@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in VR does not work or feels wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Say where in the game (hallway, a room, window, peephole, menu, dialogue, day number).
+    validations:
+      required: true
+  - type: input
+    id: nivr
+    attributes:
+      label: NIVR version
+      placeholder: "0.2.1"
+    validations:
+      required: true
+  - type: input
+    id: headset
+    attributes:
+      label: Headset and connection
+      placeholder: "Quest 3 via Virtual Desktop, Index, Quest Link..."
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: OpenXR runtime
+      placeholder: "SteamVR 2.x, Meta Quest Link, VDXR..."
+  - type: input
+    id: game
+    attributes:
+      label: Game version
+      placeholder: "1.3.19"
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Attach or paste `BepInEx/LogOutput.log` from the game folder, from a session where the problem happened.
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: Changed settings
+      description: Any VR settings you changed from the defaults (or attach `BepInEx/config/nivr.core.cfg`).

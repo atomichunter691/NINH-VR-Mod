@@ -3,7 +3,8 @@
 Releases are built locally, because the build needs interop assemblies generated from an owned copy of the game.
 GitHub-hosted CI cannot build the plugin without committing game-derived files, which this project never does.
 
-1. Bump `<Version>` in `plugin/Core/NIVR.Core.csproj` and the version in the heading of `plugin/Core/README.md`.
+1. Bump the version in all three places: `<Version>` in `plugin/Core/NIVR.Core.csproj`, `Version` in
+   `plugin/Core/CorePlugin.cs` (what BepInEx and the log report), and the heading of `plugin/Core/README.md`.
 2. Build and package on the Windows dev machine:
    `powershell -ExecutionPolicy Bypass -File plugin\Core\package.ps1`
    This writes `release\NIVR-<version>.zip` and fails if anything outside the four-file allowlist ends up in it.
