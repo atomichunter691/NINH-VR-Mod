@@ -1192,7 +1192,9 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                     if (v == null || !v.gameObject.scene.IsValid()) continue;
                     if (p[0] == "objects")
                         CorePlugin.Log.LogInfo($"  [{i}] {v.GetIl2CppType().Name} '{v.name}' parent='{(v.transform.parent != null ? v.transform.parent.name : "")}' active={v.gameObject.activeInHierarchy} pos={v.transform.position.ToString("F2")} " +
-                                               $"stand={(v._standingPos != null ? v._standingPos.position.ToString("F2") : "-")} lookAt={(v._lookAtPos != null ? v._lookAtPos.position.ToString("F2") : "-")} fov={v._fov}");
+                                               $"stand={(v._standingPos != null ? v._standingPos.position.ToString("F2") : "-")} lookAt={(v._lookAtPos != null ? v._lookAtPos.position.ToString("F2") : "-")} fov={v._fov} " +
+                                               $"looking={v.IsLooking} animating={v._isAnimating} locked={v._isLocked} canLeave={v._canLeave} eKey={v._canBeOpenedByEKey} lookAngle={v._awaitedPlayerLookAngle} " +
+                                               $"noTimeOfDay=[{(v.ProhibitedToUseDaytime != null ? string.Join(",", v.ProhibitedToUseDaytime) : "")}] noDays=[{(v.ProhibitedDays != null ? string.Join(",", v.ProhibitedDays) : "")}]");
                     else if (i == int.Parse(p[1])) { v.Act(); CorePlugin.Log.LogInfo($"Act() on {v.name}"); }
                 }
                 break;
@@ -1225,7 +1227,17 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                     var it = items[i];
                     if (it == null || !it.gameObject.scene.IsValid()) continue;
                     if (p[0] == "inter")
-                        CorePlugin.Log.LogInfo($"  [{i}] {it.GetIl2CppType().Name} '{it.name}' parent='{(it.transform.parent != null ? it.transform.parent.name : "")}' active={it.gameObject.activeInHierarchy} pos={it.transform.position.ToString("F2")}");
+                    {
+                        // The game's own gate (AInteractableObject.OnUpdate): targeted, enabled, hard and soft conditions.
+                        string gate;
+                        try { gate = $"enabled={it._isEnabled} hard={it.HardConditions} soft={it.SoftConditions} energy={it.EnergyCost}"; }
+                        catch (Exception e) { gate = "conditions threw " + e.GetType().Name; }
+                        var rt = it._raycastTarget;
+                        var rc = rt != null ? rt.GetComponent<Collider>() : null;
+                        CorePlugin.Log.LogInfo($"  [{i}] {it.GetIl2CppType().Name} '{it.name}' parent='{(it.transform.parent != null ? it.transform.parent.name : "")}' active={it.gameObject.activeInHierarchy} pos={it.transform.position.ToString("F2")} {gate} " +
+                                               (rt == null ? "target=none" : $"target='{rt.name}' targetActive={rt.gameObject.activeInHierarchy} locked={rt.IsLocked} " +
+                                                                             (rc != null ? $"center={rc.bounds.center.ToString("F2")} size={rc.bounds.size.ToString("F2")}" : "no collider")));
+                    }
                     else if (i == int.Parse(p[1])) { it.Interact(); CorePlugin.Log.LogInfo($"Interact() on {it.name}"); }
                 }
                 break;

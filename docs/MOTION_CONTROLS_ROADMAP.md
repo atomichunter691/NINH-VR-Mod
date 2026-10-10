@@ -1,7 +1,8 @@
 # NIVR motion controls: audit and roadmap
 
-Written 2026-10-10 against NIVR 0.2.1 (`main` at `ef398a4`). This is a planning document. Nothing in it has been built or
-run: the plugin only compiles against interop assemblies generated from a local copy of the game, so the audit below is
+Written 2026-10-10 against NIVR 0.2.1 (`main` at `ef398a4`). Phase 0 status and what it changed are in section 9; the
+verified per-interaction facts are in `docs/INTERACTION_INVENTORY.md`. Sections 1 and 2 are the original audit, written
+before anything was built or run: the plugin only compiles against interop assemblies generated from a local copy of the game, so the audit below is
 a read of the source and `docs/DEV_NOTES.md`, not a test run. Anything that depends on how the game behaves at runtime is
 marked **(inferred)** and has to be confirmed on the PC with the headset or the simulator.
 
@@ -70,10 +71,10 @@ Ranked by how much they matter for motion controls. File references are to this 
    on a camera-space canvas; the shotgun is a HUD sprite (`Gun`). They are triggered by `Interact()`. A gesture can
    trigger them, but the picture they produce is flat and head-locked on the UI panel unless the mod suppresses or
    replaces it. This is the largest design decision in the roadmap (see Phase 4).
-6. **Method bodies are unknown.** The interop decompile has signatures only (DEV_NOTES 1.4 item 5); the notes list
-   Cpp2IL pseudo-code on `GameAssembly.dll` as the next step and nobody has done it. Gesture design for items, the cat
-   and the gun depends on knowing whether `Interact()` is a press, a hold, or a toggle. This is Phase 0 work and needs
-   the PC.
+6. **Method bodies were unknown.** *Resolved in Phase 0:* Cpp2IL pseudo-code was produced with the library BepInEx
+   already ships and read for every class listed in 0.1. In one line: every `Interact()` is a press, `Act()` is a
+   toggle, and the gun, the cat and "show your hands" are driven by dialogue-script commands, not by player input.
+   See `docs/INTERACTION_INVENTORY.md`.
 7. **Input-device coverage is thin.** `XrInput.Create` suggests bindings for Touch, Index, Vive, WMR and the Khronos
    simple profile only. Consequences **(inferred from the binding tables, not tested)**: Index has no menu binding
    (the system button is not bindable), so left Menu = pause does not exist there; Vive and the simple profile have no
@@ -146,7 +147,8 @@ Ranked by how much they matter for motion controls. File references are to this 
 ## 4. Interaction inventory
 
 Every interaction found in `docs/DEV_NOTES.md` sections 1.6 to 1.11, with today's control and the motion-control target.
-"Phase" refers to section 5. All game-side classes are from the notes; behaviour marked **(inferred)** must be confirmed.
+"Phase" refers to section 5. Rows were re-checked in Phase 0 against `docs/INTERACTION_INVENTORY.md` (its section numbers
+are given as "inv. N"); what is still marked **(inferred)** there is repeated here.
 
 ### 4.1 Hallway (`s1_GameScene`, 3D)
 
@@ -156,24 +158,24 @@ Every interaction found in `docs/DEV_NOTES.md` sections 1.6 to 1.11, with today'
 | Turn | `AddControlYawInput`, body follows head | Right stick snap/smooth | Keep. Physical turning already works; add optional grab-and-pull turn | 7 |
 | Crouch | `Character.Crouch/UnCrouch` where `canEverCrouch` | Stick click, optional head-drop | Keep head-drop; positive case still untested | 0 test |
 | Run | `SetRunAvailability`, RT | Right grip | Keep; arm-swing speed as an option | 7 |
-| Doors (6) | `DoorTrigger.Act()` via `ARaycastTarget` | Laser + A / trigger | Reach to the door, push or pull past a distance | 1 |
-| Peephole | `PeepholeTrigger.Act()`, `TryLeave()` | Laser + trigger; B leaves | Lean the eye to the hole to look, lean back to leave | 1 |
-| Window blinds (2) | `WindowBlindsTrigger` | Laser + trigger | Grab the blind and pull down / sideways; lean back to leave | 1 |
-| Curtains window | `WindowCurtainsTrigger` | Laser + trigger | Grab and sweep sideways | 1 |
-| Phone (hallway) | `PhoneInteractable.Interact()` -> close-up | Laser + A | Reach, lift handset (grip) | 1, 3 |
-| Radio (hallway) | `RadioInteractable.Interact()` -> close-up | Laser + A | Reach to radio | 1, 3 |
-| Calendar (world canvas) | `CalendarInteractable` | Laser + A | Poke / swipe on the page **(inferred: world-space canvas)** | 1 |
-| Save point | `SaveInteractable` | Laser + A | Reach and press | 1 |
-| Cat | `CatInteractable`; animations Take/Hold/ReleaseNaperdysh | Laser + A | Stroke to pet; grip to pick up, release to put down **(inferred: hold semantics)** | 1, 4 |
-| Cigarette | `CigaretteInteractable`; `SmokeCigarette` | Laser + A | Take, bring to mouth | 4 |
-| Mushroom, hatch, hole, window boards, zoom, ending launch | `MushroomInteractable`, `HatchInteractable`, `TheHoleInteractable`, `WindowBoardsInteractable`, `ZoomInteractable`, `EndingLaunchInteractable` | Laser + A | Generic reach-and-grab; specific gestures decided after recon | 0, 1 |
+| Doors (6) | `DoorTrigger.Act()` via `ARaycastTarget`. `Act()` is a toggle; all doors except the Bedroom refuse at night and on day 14 (inv. 1.2, 3) | Laser + A / trigger | Reach to the door, push or pull past a distance. On refusal the game already plays a sound and a subtitle | 1 |
+| Peephole | `PeepholeTrigger.Act()`, `TryLeave()`. Night only. Hole at (-4.12, 1.47, -4.23), 0.39 m in front of the standing point (inv. 4.3) | Laser + trigger; B leaves | Lean the eye to the hole to look, lean back to leave (must check `_canLeave`, `TryLeave()` does not) | 1 |
+| Window blinds (2) | `WindowBlindsTrigger`. Night only, some days prohibited (inv. 3) | Laser + trigger | Grab the blind and pull down / sideways; lean back to leave | 1 |
+| Curtains window | `WindowCurtainsTrigger`. Night only, some days prohibited (inv. 3) | Laser + trigger | Grab and sweep sideways | 1 |
+| Phone (hallway) | `PhoneInteractable.Interact()` -> close-up. A press; daytime and day < 14 only (inv. 2) | Laser + A | Reach, lift handset (grip) | 1, 3 |
+| Radio (hallway) | `RadioInteractable.Interact()` -> close-up. A press; daytime only (inv. 2) | Laser + A | Reach to radio | 1, 3 |
+| Calendar | `CalendarInteractable`, a `ZoomInteractable`: press opens a zoom camera, Exit closes it. It has **no ray target** on the dev save, so the game never opens it there (inv. 2, 4.2) | Not reachable | Dropped from Phase 1 unless a later save shows it enabled. If it is, lean in to zoom, lean back to close | - |
+| Save point | `SaveInteractable`: a press that opens a Yes / No confirmation; needs kombucha and day < 14 (inv. 2) | Laser + A | Reach and press; the confirmation by poke (Phase 2 / 3) | 1 |
+| Cat | A `DialogInteractable` on the cat opens a dialog; `CatInteractable.Interact()` is empty. "Pet" and "take" are dialogue commands; take is a fixed timed sequence, not a hold (inv. 2, 5.4) | Laser + A, then pick an answer | Reach to open the dialog. Optional: a stroke gesture calls `Pet()` directly (sound and particles only). No carry gesture: the game has no carry state | 1, 2 |
+| Cigarette | `CigaretteInteractable`: a press that opens a Yes / No confirmation; "Yes" smokes. Daytime, day < 14, at least one cigarette (inv. 2) | Laser + A | Take, bring to mouth = the "Yes" | 4 |
+| Mushroom, hatch, hole, window boards, ending launch | `MushroomInteractable`, `HatchInteractable`, `TheHoleInteractable`, `WindowBoardsInteractable`, `EndingLaunchInteractable`. All are a single press that starts a scripted sequence; the hole costs 1 energy and spends the day (inv. 2) | Laser + A | Generic reach-and-press. Hatch: pull up. Hole: a digging motion is possible later, the game only needs the one press | 1 |
 | Zone triggers (go to location, open door, run, crouch, close scene) | `ATriggerObject` subclasses | Walk | None needed | - |
 
 ### 4.2 2D rooms behind doors (Kitchen, Office, Bedroom, BigRoom, Bathroom, Pantry, Entrance)
 
 | Interaction | Game hook | Today | Motion target | Phase |
 |---|---|---|---|---|
-| Click characters / objects | `UIButton.Click()`, hover via `IsMousePosInSpriteArea` | Laser on the room wall + trigger | Poke the picture with a fingertip (hover on proximity, click on contact), laser stays | 2 |
+| Click characters / objects | `RoomDisplayer.Update` does hover (mouse position, alpha test) and calls `UIButton.Click()` on Submit / LMB. `Click()` itself checks nothing (inv. 1.3) | Laser on the room wall + trigger | Poke the picture with a fingertip (hover on proximity, click on contact), laser stays. Feed the pointer position rather than calling `Click()` | 2 |
 | Leave room | cursor / B | B | Step or lean back; B stays | 2 |
 | Bedroom TV video | `VideoPlayer` | Passive | None | - |
 
@@ -183,33 +185,34 @@ Every interaction found in `docs/DEV_NOTES.md` sections 1.6 to 1.11, with today'
 |---|---|---|---|---|
 | Choose an answer | `FakeOptionView` (Selectable) | Laser + trigger | Poke; optional head nod / shake for two-answer questions | 2 |
 | Skip a line | `DialogView.SkipLine`, X | X or trigger | Forward flick of a hand; X stays | 2 |
-| Visitor signs (eyes, hands, teeth, ear, armpit, photo) | `ShowSign(CharacterSOData, ECharacterSign)` | Passive display | Lean in to examine; hand-held photo to eye level | 2 |
-| "Show me your hands" (player's hands) | `PlayerSigns.IsHandsFake`, `_handsSpriteHuman/Imposter` | Passive display | Raise both hands, palms out, in front of the chest to give the answer. **Needs recon: is the show-hands moment a player choice or a scripted beat?** | 2 |
+| Visitor signs (eyes, hands, teeth, ear, armpit, photo) | Dialogue command `ShowSign` -> `DialogSignsView.ShowSign`; passive, and the game calls its own `Vibrator` here (inv. 5.3) | Passive display | Lean in to examine; map the game's rumble to controller haptics | 2 |
+| "Show me your hands" (player's hands) | Dialogue command `ShowPlayerSign`; `PlayerSigns.IsHandsFake` (set by digging the hole, cleared by washing) picks the picture. **A scripted beat, not a player choice** (inv. 5.3) | Passive display | Optional flourish only: raising both hands while the picture is up. Whether a dialog *answer* leads to it needs one conversation watched in the game | 2 |
 | Peephole visitor conversation | Dialog over `PeepholeCam` | Laser on the peephole picture | Same as above | 2 |
 
 ### 4.4 Close-ups
 
 | Interaction | Game hook | Today | Motion target | Phase |
 |---|---|---|---|---|
-| Fridge: hover items, hold to drink / consume | `FridgeCloseUpView`, `ConsumablesCloseUp`, `MouseParallax` | Laser hover, hold A | Pick an item with grip, hold it to the mouth; head position drives the parallax | 3, 4 |
+| Fridge: hover items, hold to drink / consume | `FridgeCloseUpView` hovers by mouse position; `FridgeItemView` is a real **hold** (use progress while pressed) (inv. 5.1) | Laser hover, hold A | Pick an item with grip, hold it to the mouth (the dwell replaces the hold); head position drives the parallax | 3, 4 |
 | Phone keypad | `PhoneCloseUpView` | Laser + A | Poke the keys on a floating keypad | 3 |
 | Radio: knob, AM/FM handles | `RadioCloseUpView`, `UIRadioKnob`, handles | Trigger + controller twist; grips for handles | Each hand grabs its own control; two-handed tuning | 3 |
-| Mushroom list, notepad | `MushroomlistCloseUp`, `NotepadController` | Laser | Poke, scroll by stick or drag. **Needs recon: what the notepad does.** | 3 |
-| Hold-to-close | `ACloseUpView._holdProgress` | Hold B | Pull the view away with both hands, or lean back | 3 |
+| Mushroom list | `MushroomlistCloseUp` | Laser | Poke, scroll by stick or drag | 3 |
+| Notepad | `NotepadController.Open/Close`; the view listens to two keyboard keys and the mouse only, so **it cannot be opened with the controllers today** (inv. 6) | Not reachable | A system gesture or wrist-menu entry that calls `Open()` / `Close()` | 5 |
+| Hold-to-close | `ACloseUpView.OnUpdateAction`: hold Exit until `_holdProgress` reaches the target when the view is hold-to-close, a press otherwise (inv. 5.1) | Hold B | Pull the view away with both hands, or lean back | 3 |
 
 ### 4.5 Items, hands and the gun
 
 | Interaction | `EHUDAnimation` | Motion target | Phase |
 |---|---|---|---|
-| Wash / inspect hands | `WatchCleanHands`, `WatchDirtyHands` | Raise both hands and turn them | 4 |
+| Wash / inspect hands | `WatchCleanHands`, `WatchDirtyHands` | Started by script (no constant call site found, inv. 5.1). Raise both hands and turn them as a flourish while it plays | 4 |
 | Smoke | `SmokeCigarette` | Cigarette to mouth, inhale pause | 4 |
 | Beer, kombucha | `DrinkBeer`, `DrinkKombucha` | Tilt the held can/bottle at the mouth | 4 |
 | Eat mushroom | `EatMushroom` | Bring to mouth | 4 |
 | Open tin | `OpenTin` | Two-hand pull / twist | 4 |
 | Photograph | `CapturePhoto` | Hold a camera to the eyes, trigger as shutter | 4 |
 | Throw postcard | `ThrowPovistka` | Throw: grip release with hand velocity above a threshold | 4 |
-| Cat | `Take/Hold/ReleaseNaperdysh` | Grip to hold, release to put down | 1, 4 |
-| Shotgun | `Gun`, `GunShow/GunHide`, `GunShot` | Two-hand raise, aim along the barrel, trigger fires. **Needs recon: where the game lets the player use it.** | 4 |
+| Cat | `Take/Hold/ReleaseNaperdysh` | None: the sequence is started by the dialogue answer "take" and runs on a timer | - |
+| Shotgun | `Gun`, `GunShow/GunHide`, `GunShot` | Scripted by the dialogue (`SetUpGun`, `KillCharacter`, `FakeShot`); the player only picks the answer (inv. 5.2). Optional: raise-and-aim as another way to pick the "shoot" answer | 4 |
 
 ### 4.6 Menus and meta
 
@@ -245,8 +248,8 @@ the largest design decision; 5 to 7 are polish and options.
 
 | # | Task | Where it can be done |
 |---|---|---|
-| 0.1 | Run Cpp2IL pseudo-code on `GameAssembly.dll` for: `AInteractableObject` and all subclasses, `AActionableObjectView` subclasses, `UIButton`, `HUDView.PlayAnimation`, `Gun`, `CatInteractable`, `NotepadController`, `DialogView.ShowSign`, `PlayerSigns`. Record whether each `Interact()` is press / hold / toggle, its `HardConditions` and where it plays which animation. | PC |
-| 0.2 | Write `docs/INTERACTION_INVENTORY.md`: section 4 of this file, with every **(inferred)** replaced by a verified fact, per-object world position and collider size from a hallway dump. | PC to gather, cloud to write up |
+| 0.1 | **Done.** Run Cpp2IL pseudo-code on `GameAssembly.dll` for: `AInteractableObject` and all subclasses, `AActionableObjectView` subclasses, `UIButton`, `HUDView.PlayAnimation`, `Gun`, `CatInteractable`, `NotepadController`, `DialogView.ShowSign`, `PlayerSigns`. Record whether each `Interact()` is press / hold / toggle, its `HardConditions` and where it plays which animation. | PC |
+| 0.2 | **Done, with open items** (inventory section 9: daytime values, three animation values, dialogue nodes). Write `docs/INTERACTION_INVENTORY.md`: section 4 of this file, with every **(inferred)** replaced by a verified fact, per-object world position and collider size from a hallway dump. | PC to gather, cloud to write up |
 | 0.3 | Add a pure-C# project `src/NIVR.Gestures` (no Unity, no game types; `System.Numerics`) with: hand kinematics filter, proximity/zone tests, push/pull, grab-hold, stroke, throw, lean-in, nod/shake, raise-hands recognizers. Add an xUnit project and a GitHub Actions workflow that builds and tests only these two projects. | Cloud (written); first CI run in GitHub |
 | 0.4 | Request velocity in `LocateSpace` and expose `Velocity` / `AngularVelocity` on `VRController`. | Write in cloud; verify on PC |
 | 0.5 | Introduce the feature-module seam: a small `IMotionModule` (`Tick(frame)`, `OnModeChanged`), a fixed tick order in `VRCoreBehaviour.Update`, and an input-arbitration object replacing the `Swallow*` statics for new code. | Write in cloud; compile and regression-test on PC |
@@ -265,10 +268,15 @@ no-op module ticks in the headset without changing behaviour.
 - `ReachTargets` provider: every `ARaycastTarget` / `LinkedActionableObject` in range with its bounds; refresh when the
   active location changes.
 - Intent gestures: push/pull past 10 cm for doors, grab-and-pull for blinds, grab-and-sweep for curtains, lean-in
-  to the peephole hole position and lean-back to leave, stroke to pet the cat, grip to carry. Thresholds are config
-  values exposed in the VR settings page.
-- Dispatcher calls `Act()` / `Interact()` through the existing conditions; on refusal show the game's faded hint and a
-  "denied" pulse.
+  to the peephole hole position and lean-back to leave, reach-and-press for phone, radio, save point, cigarettes,
+  hatch and the cat's dialog. Thresholds are config values exposed in the VR settings page. (The cat "carry" and the
+  calendar were dropped after the recon, see section 4.1.)
+- Dispatcher: `Interact()` and `Act()` called directly skip the game's own gate, so the dispatcher repeats it:
+  for `AInteractableObject` require `_isEnabled`, `HardConditions`, `SoftConditions` and an active, unlocked ray
+  target; for `AActionableObjectView` just call `Act()` (it checks animation, lock, time of day and day itself and
+  plays the refusal sound and subtitle). Leaving checks `_canLeave` before `TryLeave()`. On refusal add a "denied"
+  pulse.
+- `PauseGuard` must not release the UI-state counter while a zoom view is open (inventory 8.1), should one be used.
 - Keep the laser: gesture and laser compete through the arbitration object, laser wins while pointing.
 
 **Headset needed:** all of it for feel (reach distance, thresholds, hand scale, false positives). **Simulator:** the
@@ -317,14 +325,26 @@ Decision to take first (both options are cheap to prototype in Phase 0):
   being applied. More work, much better presence.
 
 Recommended: A for Phase 4's first release, B per item afterwards, starting with the cigarette and the drink, since
-their gestures are the simplest. The gun and throw need the most care:
+their gestures are the simplest.
 
-- Postcard throw: grip release above a hand-speed threshold, haptics at release.
-- Shotgun: only after 0.1 shows where the game uses it; two-hand grab, aim along the barrel, trigger fires. If it is a
-  scripted beat, the gesture is just the confirm.
-- Photograph: camera held to the eye, trigger = shutter.
+**Changed by the Phase 0 recon (inventory 5.1 to 5.4).** Most of these animations are not started by a player input
+the mod can replace. They start in one of three ways: after "Yes" in a confirmation close-up (cigarette, save point),
+after a fridge item's hold completes, or from a dialogue-script command (`PlayAnimation`, `SetUpGun`, `KillCharacter`,
+`TakeCat`). `HUDView.PlayAnimation` is fire and wait, with no input while it runs. So the gesture's job is narrower
+than this phase first assumed:
 
-**Headset needed:** all. **Exit:** every `EHUDAnimation` has a motion trigger and a documented fallback.
+- Confirmation close-ups: the gesture is the "Yes" (bring the cigarette / bottle to the mouth), a hand pushed away is
+  the "No".
+- Fridge: the bring-to-mouth dwell replaces the hold on the item.
+- Dialogue-driven animations (postcard, photo, tin, gun, cat): the gesture can only be another way of choosing the
+  dialog answer that leads to them. That needs the dialog's answer list at runtime and a mapping from answer to
+  gesture, which is Phase 2 work (poke on answers) plus a per-answer table. Until that table exists these stay on
+  poke / laser.
+- Shotgun: scripted. The raise-and-aim gesture is optional and only ever selects the "shoot" answer.
+- Postcard throw: only meaningful if the "give the postcard" answer can be identified; otherwise dropped.
+
+**Headset needed:** all. **Exit:** every animation that follows a confirmation or a fridge hold has a motion trigger;
+every dialogue-driven one is listed with the answer that starts it and a documented fallback.
 
 ### Phase 5: Menus and system gestures
 
@@ -387,3 +407,37 @@ phase's exit criteria.
 Phase 0, then Phase 1 (smallest change, biggest effect), Phase 3 (radio and phone, mostly extending existing code),
 Phase 2, Phase 5, Phase 4, Phase 6, Phase 7. Phase 4 moves earlier if item animations turn out to feel worst in the
 headset during Phases 1 to 3.
+
+---
+
+## 9. Phase 0 progress log
+
+Newest last. Each entry says what was done, how it was verified and what surprised us.
+
+### 9.1 Build check (2026-10-10)
+
+`plugin\Core\build.ps1` on the roadmap branch: 0 warnings, 0 errors, dll deployed. Launched the game copy with
+`Backend = Simulator`, `[Debug] CommandDir` set and `SaveSandbox = true`: the log shows the four SaveSandbox guards,
+"Simulator backend", "VR active", and `status` answers through the command channel (674 fps in the menu,
+`eyeCpuMs` 1.22). No surprises.
+
+### 9.2 Recon, tasks 0.1 and 0.2 (2026-10-10)
+
+Result: `docs/INTERACTION_INVENTORY.md`. Verified by reading Cpp2IL pseudo-code (static) and by the simulator on the
+dev save (runtime); each fact in the inventory says which.
+
+Surprises, all of which changed this document:
+
+1. Cpp2IL did not have to be installed: BepInEx ships the library, and its ISIL output is enough.
+2. Every `Interact()` is a press. The only real hold in the game's interactions is the fridge item and the
+   hold-to-close of some close-ups.
+3. The cat, the shotgun and "show me your hands" are dialogue-script commands. Rows in 4.1, 4.3 and 4.5 and the whole
+   of Phase 4 were rewritten.
+4. The calendar is a zoom view with no ray target on the dev save; the notepad is keyboard and mouse only and cannot
+   be opened from the controllers at all.
+5. All room doors except the Bedroom are closed at night, windows and the peephole are closed by day. The dev save is
+   a night save, so **Phase 1 cannot be exit-tested on it**: a daytime save (made by the owner, with the sandbox still
+   on for the test runs) is needed for doors, phone, radio, cigarettes and the hatch.
+6. Calling `Interact()` directly bypasses the game's gate, and `TryLeave()` ignores `CanLeave`. The dispatcher design
+   in Phase 1 now says so.
+7. `PauseGuard`'s stuck-counter recovery releases a zoom view's UI state after 2.5 s (seen at runtime).
