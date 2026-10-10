@@ -1,0 +1,33 @@
+# Builds and tests the gesture library only. The plugin itself cannot be built here: it compiles against interop
+# assemblies generated from a local copy of the game, which are never committed (see RELEASING.md).
+name: Gestures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/NIVR.Gestures/**'
+      - 'src/NIVR.Gestures.Tests/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/gestures.yml'
+  pull_request:
+    paths:
+      - 'src/NIVR.Gestures/**'
+      - 'src/NIVR.Gestures.Tests/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/gestures.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test
+        run: dotnet test src/NIVR.Gestures.Tests/NIVR.Gestures.Tests.csproj -c Release --nologo
