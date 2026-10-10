@@ -250,7 +250,7 @@ the largest design decision; 5 to 7 are polish and options.
 |---|---|---|
 | 0.1 | **Done.** Run Cpp2IL pseudo-code on `GameAssembly.dll` for: `AInteractableObject` and all subclasses, `AActionableObjectView` subclasses, `UIButton`, `HUDView.PlayAnimation`, `Gun`, `CatInteractable`, `NotepadController`, `DialogView.ShowSign`, `PlayerSigns`. Record whether each `Interact()` is press / hold / toggle, its `HardConditions` and where it plays which animation. | PC |
 | 0.2 | **Done, with open items** (inventory section 9: daytime values, three animation values, dialogue nodes). Write `docs/INTERACTION_INVENTORY.md`: section 4 of this file, with every **(inferred)** replaced by a verified fact, per-object world position and collider size from a hallway dump. | PC to gather, cloud to write up |
-| 0.3 | Add a pure-C# project `src/NIVR.Gestures` (no Unity, no game types; `System.Numerics`) with: hand kinematics filter, proximity/zone tests, push/pull, grab-hold, stroke, throw, lean-in, nod/shake, raise-hands recognizers. Add an xUnit project and a GitHub Actions workflow that builds and tests only these two projects. | Cloud (written); first CI run in GitHub |
+| 0.3 | **Done locally (36 tests pass); first CI run happens on the pull request.** Add a pure-C# project `src/NIVR.Gestures` (no Unity, no game types; `System.Numerics`) with: hand kinematics filter, proximity/zone tests, push/pull, grab-hold, stroke, throw, lean-in, nod/shake, raise-hands recognizers. Add an xUnit project and a GitHub Actions workflow that builds and tests only these two projects. | Cloud (written); first CI run in GitHub |
 | 0.4 | **Written and simulator-checked; headset check pending.** Request velocity in `LocateSpace` and expose `Velocity` / `AngularVelocity` on `VRController`. | Write in cloud; verify on PC |
 | 0.5 | **Done in the simulator; headset tick check pending.** Introduce the feature-module seam: a small `IMotionModule` (`Tick(frame)`, `OnModeChanged`), a fixed tick order in `VRCoreBehaviour.Update`, and an input-arbitration object replacing the `Swallow*` statics for new code. | Write in cloud; compile and regression-test on PC |
 | 0.6 | Extend the simulator: scripted hand paths (`simpath l|r <name>`), so gestures can be exercised and screenshotted without a headset. | PC |
@@ -400,7 +400,7 @@ phase's exit criteria.
 2. Phase 4 option A (canned animation, trigger by gesture) or B (3D props) as the first release?
 3. Is room-scale locomotion in scope, or is the hallway stick-and-turn model final?
 4. Can the next recon session include Cpp2IL output? Phases 1 and 4 cannot be finalised without it.
-5. Is a separate gesture library project acceptable in the repo structure (it enables CI tests but adds a project)?
+5. Is a separate gesture library project acceptable in the repo structure (it enables CI tests but adds a project)? *Assumed yes: the Phase 0 brief asked for it.*
 
 ## 8. Suggested order
 
@@ -473,3 +473,35 @@ Deviations from the task text, on purpose:
 Surprise: in the simulator a room opened with the `act` debug command cannot be left with B or paused with Menu.
 This is the same on the commit before this work, so it is not caused by it, but DEV_NOTES 2.12 recorded "B leaves the
 room" as verified. On the headset checklist.
+
+### 9.5 Gesture library and CI, task 0.3 (2026-10-10)
+
+`src/NIVR.Gestures` (netstandard2.1, `System.Numerics` only) with zone tests, a velocity filter and recognizers for
+push / pull, grab-hold, stroke, throw, lean-in, nod / shake and raise-both-hands; `src/NIVR.Gestures.Tests` (xUnit,
+36 tests); `.github/workflows/gestures.yml` builds and tests only these two projects. See
+`src/NIVR.Gestures/README.md`.
+
+Verified: `dotnet test` passes locally (36 of 36); `plugin\Core\build.ps1` and `scripts\build.ps1` still build and
+deploy the plugins and do **not** deploy the gesture dll. Not verified: the workflow itself, until GitHub runs it.
+
+Things to know:
+
+1. The root `Directory.Build.props` applied the plugin settings (game references, auto-deploy into the game copy) to
+   every project in the repo. Projects whose name starts with `NIVR.Gestures` are now exempt; without that the
+   library would have referenced the interop assemblies locally and failed to mean anything in CI.
+2. `scripts\build.ps1` builds every project under `src`, so it now also builds the library and its tests. Harmless.
+3. The plugin does not use the library yet. Nothing in Phase 0 needed it; Phase 1 decides between linking the sources
+   into `NIVR.Core` and shipping a fifth file.
+4. Every threshold is a guess until a headset session. The recognizers were shaped by the recon: there is no "carry"
+   or "aim and fire" recognizer because the game has nothing for them to drive (inventory section 7).
+
+### 9.6 Phase 0 state
+
+| Exit criterion | State |
+|---|---|
+| `INTERACTION_INVENTORY.md` has no inferred rows for hallway objects | **Not met.** Night-save facts are verified; daytime values, the cigarette / cat / hatch target bounds and three animation values are open (inventory section 9) |
+| CI is green on the gesture library | Pending the first run on the pull request |
+| A no-op module ticks in the headset without changing behaviour | Simulator only; headset pending |
+
+Not started in this pass: 0.6 (scripted hand paths in the simulator), 0.7 (physical crouch and haptics in the
+headset), 0.8 (docs cleanup).
