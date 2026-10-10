@@ -46,6 +46,72 @@ public sealed class VRController
     public float GripValue { get; internal set; }
     public Vector2 Stick { get; internal set; }
 
+    /// <summary>
+    /// Smoothed linear velocity of the grip pose in world space, metres per second. Motion of the hand inside the
+    /// tracking space only: walking, turning and scripted camera moves do not show up here.
+    /// </summary>
+    public Vector3 Velocity => ToWorld(_grip.Linear, true);
+    /// <summary>Smoothed angular velocity of the grip pose in world space: axis times radians per second.</summary>
+    public Vector3 AngularVelocity => ToWorld(_grip.Angular, false);
+    /// <summary>Same two values for the aim pose (the tip of the pointing ray swings faster than the grip).</summary>
+    public Vector3 AimVelocity => ToWorld(_aim.Linear, true);
+    public Vector3 AimAngularVelocity => ToWorld(_aim.Angular, false);
+    /// <summary>Tracking-space values (before recenter, world scale and the rig's heading).</summary>
+    public Vector3 LocalVelocity => _grip.Linear;
+    public Vector3 LocalAngularVelocity => _grip.Angular;
+    /// <summary>True when the runtime reported the grip velocity; false when it is derived from pose differences.</summary>
+    public bool VelocityFromRuntime { get; private set; }
+
+    /// <summary>Time constant of the velocity smoothing, seconds. Short: throws and flicks last about 0.1 s.</summary>
+    internal const float VelocitySmoothing = 0.04f;
+    private PoseKinematics _grip, _aim;
+
+    private static Vector3 ToWorld(Vector3 local, bool scaled)
+    {
+        var o = VRRig.Origin;
+        if (o == null) return local;
+        return scaled ? o.TransformVector(local) : o.rotation * local;
+    }
+
+    /// <summary>Feeds this frame's tracking-space poses (and the runtime's velocities, where it gave any).</summary>
+    internal void UpdateKinematics(float dt, Vector3 gripPos, Quaternion gripRot, Vector3? gripLinear, Vector3? gripAngular,
+        Vector3 aimPos, Quaternion aimRot, Vector3? aimLinear, Vector3? aimAngular)
+    {
+        VelocityFromRuntime = IsGripTracked && gripLinear.HasValue && gripAngular.HasValue;
+        _grip.Step(dt, IsGripTracked, gripPos, gripRot, gripLinear, gripAngular);
+        _aim.Step(dt, IsAimTracked, aimPos, aimRot, aimLinear, aimAngular);
+    }
+
+    /// <summary>Velocity of one tracked pose: the runtime's value when given, else the pose difference, low-pass filtered.</summary>
+    private struct PoseKinematics
+    {
+        public Vector3 Linear, Angular;
+        private Vector3 _lastPos; private Quaternion _lastRot; private bool _hasLast;
+
+        public void Step(float dt, bool tracked, Vector3 pos, Quaternion rot, Vector3? linear, Vector3? angular)
+        {
+            if (!tracked) { _hasLast = false; Linear = Angular = Vector3.zero; return; }
+            if (dt > 1e-5f)
+            {
+                Vector3 lin = linear ?? (_hasLast ? (pos - _lastPos) / dt : Vector3.zero);
+                Vector3 ang = angular ?? (_hasLast ? AngularFromDelta(rot * Quaternion.Inverse(_lastRot), dt) : Vector3.zero);
+                float k = 1f - Mathf.Exp(-dt / VelocitySmoothing);
+                Linear = Vector3.Lerp(Linear, lin, k);
+                Angular = Vector3.Lerp(Angular, ang, k);
+            }
+            _lastPos = pos; _lastRot = rot; _hasLast = true;
+        }
+
+        private static Vector3 AngularFromDelta(Quaternion d, float dt)
+        {
+            if (d.w < 0f) d = new Quaternion(-d.x, -d.y, -d.z, -d.w); // shortest way round
+            var v = new Vector3(d.x, d.y, d.z);
+            float s = v.magnitude;
+            if (s < 1e-6f) return Vector3.zero;
+            return v / s * (2f * Mathf.Atan2(s, d.w) / dt);
+        }
+    }
+
     public bool GetButton(VRButton b) => _now[(int)b];
     public bool GetButtonDown(VRButton b) => _now[(int)b] && !_prev[(int)b];
     public bool GetButtonUp(VRButton b) => !_now[(int)b] && _prev[(int)b];
