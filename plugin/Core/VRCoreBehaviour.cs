@@ -77,6 +77,7 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
     private readonly ComfortOverlay _comfortOverlay = new();
     private readonly ControllerVisuals _controllerVisuals = new();
     private readonly ControlsCard _controlsCard = new();
+    private readonly Motion.MotionModules _modules = new();
     private bool _focused;
     private _Code.Player.EWatcherState? _previousState;
     private float _rightMenuHeld, _recentTurnUntil, _recenterHeight;
@@ -192,6 +193,15 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                 if (!_recentered) Recenter();
             }
 
+            // Fixed tick order. Later steps read what earlier ones decided, so keep it and add new features as motion
+            // modules (step 5), not as more calls here.
+            //   1 tracking      controllers (poses, buttons, velocities), rig transforms, body follows head, recenter
+            //   2 game state    input mode from the game's watcher state, button gate across mode changes
+            //   3 system UI     controls card, VR settings page, EventSystem focus
+            //   4 guards        PauseGuard (owns B and Menu where the game traps them)
+            //   5 motion        MotionModules: gesture features; they claim buttons in the frame's InputArbiter
+            //   6 input out     laser pre-press, virtual gamepad, laser, snap turn, physical crouch
+            //   7 comfort, events
             UpdateControllers();
             UpdateRigTransforms();
             FollowHead();
@@ -208,6 +218,7 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             VrSettings.Tick();
             KeepEventSystemFocused();
             PauseGuard.Tick(_focused && !controlsCard);
+            _modules.Tick(InputMode, state, _focused && !controlsCard);
             _pointer.PrePress(_focused && !controlsCard ? InputMode : VRInputMode.Walk, _flatScreen);
             _gamepad.Tick(_focused && !controlsCard, InputMode != VRInputMode.Gamepad, InputMode == VRInputMode.Pointer && UiPointer.ControllersPresent && UiPointer.MouseScheme,
                 TriggerRole(InputMode, state), _pointer.HandSide);
@@ -1268,7 +1279,8 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                     $"  playerYaw={(pc != null ? pc.transform.eulerAngles.y : float.NaN):F1} comfort: {Comfort.Describe()} vsync={QualitySettings.vSyncCount}\n" +
                     $"  hudYaw={FlatScreen.HudYaw:F1} crouchAllowed={(pc != null && pc._character != null && pc._character.canEverCrouch)} crouched={(pc != null && pc._character != null && pc._character.IsCrouched())}\n" +
                     $"  game: {GameState.Describe()}\n" +
-                    $"  hands: {DescribeHand(VRRig.LeftController)} | {DescribeHand(VRRig.RightController)}");
+                    $"  hands: {DescribeHand(VRRig.LeftController)} | {DescribeHand(VRRig.RightController)}\n" +
+                    $"  modules: {_modules.Describe()}");
                 break;
             case "kin": // kin [seconds]: log both hands' velocities twice a second (wave a controller, then read nivr.log)
                 _kinUntil = Time.unscaledTime + (p.Length > 1 ? F(p[1]) : 10f);

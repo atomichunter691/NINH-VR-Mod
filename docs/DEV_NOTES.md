@@ -945,3 +945,31 @@ Needed by every gesture that depends on how fast a hand moves (throw, stroke, fl
 * Verified in the simulator only: `simhand r ...` moved by 0.3 m between two frames gives a derived peak of about
   7 m/s that decays to 0; a 60 degree yaw step gives a spin peak and no linear speed. **Not verified: the runtime
   path** (flags, units, axis signs on a real controller). That is the first item of the next headset session.
+
+### 2.19 Motion-module seam and input arbitration (motion controls Phase 0.5) - 2026-10-10
+
+Where gesture features go, so that `VRCoreBehaviour.Update` stops growing. Nothing existing was changed.
+
+* `plugin/Core/Motion/IMotionModule.cs`: `IMotionModule` (`Name`, `Tick(in MotionFrame)`, `OnModeChanged(from, to)`,
+  `Describe()`) and `MotionFrame` (frame number, unscaled delta time, input mode, the game's top watcher state,
+  `InputAllowed`, the frame's `InputArbiter`). Poses and velocities are read from `VRRig`.
+* `MotionModules.cs`: the list of modules. **The array order is the tick order and the priority for button claims.**
+  A module that throws is logged (throttled per module) and skipped for that frame.
+* `InputArbiter.cs`: `Claim(hand, button, owner)`, `IsClaimed`, `Owner`, `ClaimCount`. Claims last one frame. This is
+  for new code; `UiPointer.SwallowTrigger`, `PauseGuard.SwallowEast` and `ButtonGate` are untouched and nothing reads
+  the arbiter yet. The first module that consumes a button has to make `VirtualGamepad.Tick` / `UiPointer.PrePress`
+  ask `MotionModules.Input.IsClaimed` for that button (one line each), and that is the moment to move the old flags.
+* `NoOpModule.cs`: counts ticks and mode changes; the template for a real module.
+* `VRCoreBehaviour.Update` now documents its fixed order in a comment: tracking, game state, system UI, guards
+  (`PauseGuard`), **motion modules**, input out (laser pre-press, virtual gamepad, laser, snap turn, crouch), comfort
+  and events. Modules run after `PauseGuard` (so B / Menu traps are already handled) and before any input is sent to
+  the game (so a claim can take effect in the same frame).
+* Modules do not tick while VR is inactive (`Update` returns early), and `InputAllowed` is false while the session is
+  unfocused or the first-run controls card is up.
+* Debug: `status` has a `modules:` line.
+* Verified in the simulator: log line "Motion module 'noop' is ticking", `ticks` grows by one per frame,
+  `modeChanges` counts Walk -> Pointer -> Walk -> Gamepad, `claims this frame: 0`. Regression run before and after
+  (same commands on the previous commit and on this one): walking with `pad`, Menu opens and closes pause, `act 8`
+  opens a window. Identical. **Also identical, and worth a look:** a room opened with the `act` debug command is not
+  left by `btn r secondary` and not paused by `btn l menu` in either build; the game receives B (`uiExit=True`).
+  Whether that is only the debug path or also the real flow in the simulator was not established.

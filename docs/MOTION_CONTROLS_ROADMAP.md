@@ -252,7 +252,7 @@ the largest design decision; 5 to 7 are polish and options.
 | 0.2 | **Done, with open items** (inventory section 9: daytime values, three animation values, dialogue nodes). Write `docs/INTERACTION_INVENTORY.md`: section 4 of this file, with every **(inferred)** replaced by a verified fact, per-object world position and collider size from a hallway dump. | PC to gather, cloud to write up |
 | 0.3 | Add a pure-C# project `src/NIVR.Gestures` (no Unity, no game types; `System.Numerics`) with: hand kinematics filter, proximity/zone tests, push/pull, grab-hold, stroke, throw, lean-in, nod/shake, raise-hands recognizers. Add an xUnit project and a GitHub Actions workflow that builds and tests only these two projects. | Cloud (written); first CI run in GitHub |
 | 0.4 | **Written and simulator-checked; headset check pending.** Request velocity in `LocateSpace` and expose `Velocity` / `AngularVelocity` on `VRController`. | Write in cloud; verify on PC |
-| 0.5 | Introduce the feature-module seam: a small `IMotionModule` (`Tick(frame)`, `OnModeChanged`), a fixed tick order in `VRCoreBehaviour.Update`, and an input-arbitration object replacing the `Swallow*` statics for new code. | Write in cloud; compile and regression-test on PC |
+| 0.5 | **Done in the simulator; headset tick check pending.** Introduce the feature-module seam: a small `IMotionModule` (`Tick(frame)`, `OnModeChanged`), a fixed tick order in `VRCoreBehaviour.Update`, and an input-arbitration object replacing the `Swallow*` statics for new code. | Write in cloud; compile and regression-test on PC |
 | 0.6 | Extend the simulator: scripted hand paths (`simpath l|r <name>`), so gestures can be exercised and screenshotted without a headset. | PC |
 | 0.7 | Confirm physical crouch's positive case and haptics in the headset (open items from 0.2.0). | Headset |
 | 0.8 | Docs cleanup: a one-page "current architecture" at the top of `DEV_NOTES.md`, fix the stale comments in section 2.2, delete or archive `src/NIVR.Plugin`, single source for the version. | Cloud |
@@ -454,3 +454,22 @@ that could not be done from this session and is on the headset checklist.
 
 Surprise: none in the code. One design decision worth knowing: velocities are relative to the play space, not to the
 game world, so a snap turn or a scripted camera move does not look like a hand movement.
+
+### 9.4 Module seam, task 0.5 (2026-10-10)
+
+`plugin/Core/Motion/`: `IMotionModule`, `MotionFrame`, `InputArbiter`, `MotionModules` (fixed order) and a no-op
+module. `VRCoreBehaviour.Update` ticks the modules after `PauseGuard` and before any input reaches the game, and
+documents the whole order in a comment. Details in DEV_NOTES 2.19.
+
+Verified in the simulator: the no-op module ticks once per frame and sees mode changes; a before / after run of
+walking, pause and a window gave the same results on the previous commit and on this one.
+
+Deviations from the task text, on purpose:
+
+1. The arbiter does **not** replace the `Swallow*` statics yet. The task said not to change existing behaviour, and
+   moving those flags is exactly that. It becomes a two-line change when the first module claims a button.
+2. `OnModeChanged` is delivered just before the `Tick` that sees the new mode, not from a separate event.
+
+Surprise: in the simulator a room opened with the `act` debug command cannot be left with B or paused with Menu.
+This is the same on the commit before this work, so it is not caused by it, but DEV_NOTES 2.12 recorded "B leaves the
+room" as verified. On the headset checklist.
