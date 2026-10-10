@@ -305,6 +305,22 @@ internal sealed unsafe class XrSession
         return r >= 0 && (flags & Xr.LocOrientationValid) != 0 && (flags & Xr.LocPositionValid) != 0;
     }
 
+    /// <summary>
+    /// Same, and also asks the runtime for the space's velocity (XrSpaceVelocity chained to the location).
+    /// velocityFlags says which of the two vectors the runtime filled in (Xr.VelLinearValid / VelAngularValid).
+    /// </summary>
+    public bool LocateSpace(ulong space, ulong baseSpace, long time, out XrPosef pose, out ulong flags,
+        out XrVector3f linearVelocity, out XrVector3f angularVelocity, out ulong velocityFlags)
+    {
+        var vel = new XrSpaceVelocity { type = XrStructureType.SpaceVelocity };
+        var loc = new XrSpaceLocation { type = XrStructureType.SpaceLocation, next = &vel };
+        int r = Xr.xrLocateSpace(space, baseSpace, time, &loc);
+        pose = loc.pose; flags = loc.locationFlags;
+        linearVelocity = vel.linearVelocity; angularVelocity = vel.angularVelocity;
+        velocityFlags = r >= 0 ? vel.velocityFlags : 0;
+        return r >= 0 && (flags & Xr.LocOrientationValid) != 0 && (flags & Xr.LocPositionValid) != 0;
+    }
+
     /// <summary>Main thread: stores the frame and returns the event id to pass to GL.IssuePluginEvent(RenderCallback, id).</summary>
     public int QueueFrame(in FrameSubmit frame)
     {

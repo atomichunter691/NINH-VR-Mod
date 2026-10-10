@@ -16,6 +16,7 @@ internal enum XrStructureType
     ViewLocateInfo = 6,
     View = 7,
     SessionCreateInfo = 8,
+    SpaceVelocity = 12,
     SwapchainCreateInfo = 9,
     SessionBeginInfo = 10,
     ViewState = 11,
@@ -216,6 +217,10 @@ internal unsafe struct XrEventDataSessionStateChanged
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct XrSpaceLocation { public XrStructureType type; public void* next; public ulong locationFlags; public XrPosef pose; }
 
+/// <summary>Chained to XrSpaceLocation.next to get velocities from xrLocateSpace (metres/s, radians/s, in the base space).</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct XrSpaceVelocity { public XrStructureType type; public void* next; public ulong velocityFlags; public XrVector3f linearVelocity; public XrVector3f angularVelocity; }
+
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct XrActionSetCreateInfo
 {
@@ -321,6 +326,7 @@ internal static unsafe class Xr
     public const int BlendOpaque = 1;
     public const int SpaceView = 1, SpaceLocal = 2, SpaceStage = 3;
     public const ulong LocOrientationValid = 1, LocPositionValid = 2, LocOrientationTracked = 4, LocPositionTracked = 8;
+    public const ulong VelLinearValid = 1, VelAngularValid = 2;
     public const ulong UsageColorAttachment = 0x1, UsageTransferDst = 0x10, UsageSampled = 0x20;
     public const long InfiniteDuration = long.MaxValue;
     public const ulong ApiVersion = 1UL << 48; // XR_MAKE_VERSION(1, 0, 0)

@@ -922,3 +922,26 @@ alternated; dialog options need several presses, do not appear, or the wrong one
   same trigger -> `VR UI click -> Option View(Clone) (FakeOptionView)` -> `Neighbour_Entrance_2`; left trigger x3
   advanced three lines. Core debug commands go in `logs\cmd\*.vr` files (not `cmd.ps1`, which is DevTools' `*.cmd`).
 * Not verified: how the bend looks in the headset (daylight pictures), rooms / phone / fridge with the new trigger rule.
+
+### 2.18 Hand velocities (motion controls Phase 0.4) - 2026-10-10
+
+Needed by every gesture that depends on how fast a hand moves (throw, stroke, flick, rejecting accidental touches).
+
+* `XrSession.LocateSpace` has an overload that chains `XrSpaceVelocity` (structure type 12) to the location and
+  returns linear / angular velocity plus the runtime's validity flags. `XrInput.Read` uses it for the grip and aim
+  spaces of both hands. The head still uses the plain overload.
+* `VRController` (public API): `Velocity`, `AngularVelocity` (grip pose, world space, m/s and axis times rad/s),
+  `AimVelocity`, `AimAngularVelocity`, `LocalVelocity`, `LocalAngularVelocity` (tracking space) and
+  `VelocityFromRuntime`. World-space values are the tracking-space ones turned by the rig (and divided by WorldScale
+  for the linear ones): they describe the hand moving in the play space, so walking, snap turns and scripted camera
+  moves do not appear in them.
+* Handedness: OpenXR is right-handed. A linear velocity converts like a position (z negated), an angular velocity
+  like the vector part of a rotation (x and y negated), which keeps it a valid Unity "axis times angle per second".
+* When the runtime gives no velocity (flag not set) and always in the simulator, the velocity is derived from the
+  difference between this frame's and the last frame's pose. Both sources go through the same low-pass filter
+  (time constant `VRController.VelocitySmoothing`, 0.04 s), so a consumer sees one kind of signal.
+* Debug: `status` has a `hands:` line (velocity, speed, angular velocity in degrees per second, aim speed, source);
+  `kin [seconds]` logs both hands twice a second with the peak speed since the previous line.
+* Verified in the simulator only: `simhand r ...` moved by 0.3 m between two frames gives a derived peak of about
+  7 m/s that decays to 0; a 60 degree yaw step gives a spin peak and no linear speed. **Not verified: the runtime
+  path** (flags, units, axis signs on a real controller). That is the first item of the next headset session.

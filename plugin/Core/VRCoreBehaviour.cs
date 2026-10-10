@@ -196,6 +196,7 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             UpdateRigTransforms();
             FollowHead();
             HandleRecenterInput();
+            LogKinematics();
             var mode = CurrentInputMode();
             ButtonGate.Update(mode != InputMode);
             var state = GameState.Top;
@@ -407,8 +408,17 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                         if (Time.unscaledTime < _simButtons[h][b] || Time.frameCount < _simButtonFrame) { c.IsConnected = true; c.Set((VRButton)b, true); }
                         else _simButtons[h][b] = 0f;
                     }
+            // Velocities: the runtime's own where it reports them, pose differences otherwise (always in the simulator).
+            c.UpdateKinematics(Time.unscaledDeltaTime,
+                _gripT[h].localPosition, _gripT[h].localRotation, Vel(s.gripVelFlags, Xr.VelLinearValid, s.gripLinear, false), Vel(s.gripVelFlags, Xr.VelAngularValid, s.gripAngular, true),
+                _aimT[h].localPosition, _aimT[h].localRotation, Vel(s.aimVelFlags, Xr.VelLinearValid, s.aimLinear, false), Vel(s.aimVelFlags, Xr.VelAngularValid, s.aimAngular, true));
         }
     }
+
+    // OpenXR is right-handed (-Z forward), Unity left-handed: a linear velocity flips like a position (Pos), an angular
+    // velocity like the vector part of a rotation (Rot), which keeps it "axis times radians per second" in Unity's sense.
+    private static Vector3? Vel(ulong flags, ulong bit, XrVector3f v, bool angular)
+        => (flags & bit) == 0 ? null : angular ? new Vector3(-v.x, -v.y, v.z) : new Vector3(v.x, v.y, -v.z);
 
     private readonly (Vector3 pos, Quaternion rot, float trigger)?[] _simHand = new (Vector3, Quaternion, float)?[2];
     private float _padOffAt; private int _padOffFrame;
@@ -1257,10 +1267,42 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
                     $"  cursor={Cursor.lockState} overlayCanvasesConverted={_uiCapture.ConvertedCount} roomCanvas={(_uiCapture.RoomCanvas != null)}\n" +
                     $"  playerYaw={(pc != null ? pc.transform.eulerAngles.y : float.NaN):F1} comfort: {Comfort.Describe()} vsync={QualitySettings.vSyncCount}\n" +
                     $"  hudYaw={FlatScreen.HudYaw:F1} crouchAllowed={(pc != null && pc._character != null && pc._character.canEverCrouch)} crouched={(pc != null && pc._character != null && pc._character.IsCrouched())}\n" +
-                    $"  game: {GameState.Describe()}");
+                    $"  game: {GameState.Describe()}\n" +
+                    $"  hands: {DescribeHand(VRRig.LeftController)} | {DescribeHand(VRRig.RightController)}");
+                break;
+            case "kin": // kin [seconds]: log both hands' velocities twice a second (wave a controller, then read nivr.log)
+                _kinUntil = Time.unscaledTime + (p.Length > 1 ? F(p[1]) : 10f);
+                _kinNext = 0f; _kinPeak[0] = _kinPeak[1] = _kinPeakAng[0] = _kinPeakAng[1] = 0f;
                 break;
             default: CorePlugin.Log.LogWarning("unknown vr command " + p[0]); break;
         }
+    }
+
+    private static string DescribeHand(VRController c)
+    {
+        if (!c.IsTracked) return $"{c.Hand} untracked";
+        Vector3 v = c.Velocity, w = c.AngularVelocity * Mathf.Rad2Deg;
+        return $"{c.Hand} vel={v.ToString("F2")} speed={v.magnitude:F2}m/s ang={w.ToString("F0")} spin={w.magnitude:F0}deg/s aimSpeed={c.AimVelocity.magnitude:F2}m/s src={(c.VelocityFromRuntime ? "runtime" : "derived")}";
+    }
+
+    private float _kinUntil, _kinNext;
+    private readonly float[] _kinPeak = new float[2], _kinPeakAng = new float[2];
+
+    // "kin" debug command: peaks since the last line, so a quick flick between two log lines is not missed.
+    private void LogKinematics()
+    {
+        if (_kinUntil <= 0f) return;
+        for (int h = 0; h < 2; h++)
+        {
+            var c = VRRig.Controller((VRHand)h);
+            _kinPeak[h] = Mathf.Max(_kinPeak[h], c.Velocity.magnitude);
+            _kinPeakAng[h] = Mathf.Max(_kinPeakAng[h], c.AngularVelocity.magnitude * Mathf.Rad2Deg);
+        }
+        if (Time.unscaledTime < _kinNext) return;
+        _kinNext = Time.unscaledTime + 0.5f;
+        CorePlugin.Log.LogInfo($"kin: {DescribeHand(VRRig.LeftController)} peak={_kinPeak[0]:F2}m/s {_kinPeakAng[0]:F0}deg/s | {DescribeHand(VRRig.RightController)} peak={_kinPeak[1]:F2}m/s {_kinPeakAng[1]:F0}deg/s");
+        _kinPeak[0] = _kinPeak[1] = _kinPeakAng[0] = _kinPeakAng[1] = 0f;
+        if (Time.unscaledTime >= _kinUntil) _kinUntil = 0f;
     }
 
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
