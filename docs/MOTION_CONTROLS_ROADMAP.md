@@ -250,8 +250,13 @@ the largest design decision; 5 to 7 are polish and options.
 |---|---|---|
 | 0.1 | **Done.** Run Cpp2IL pseudo-code on `GameAssembly.dll` for: `AInteractableObject` and all subclasses, `AActionableObjectView` subclasses, `UIButton`, `HUDView.PlayAnimation`, `Gun`, `CatInteractable`, `NotepadController`, `DialogView.ShowSign`, `PlayerSigns`. Record whether each `Interact()` is press / hold / toggle, its `HardConditions` and where it plays which animation. | PC |
 | 0.2 | **Done, with open items** (inventory section 9: daytime values, three animation values, dialogue nodes). Write `docs/INTERACTION_INVENTORY.md`: section 4 of this file, with every **(inferred)** replaced by a verified fact, per-object world position and collider size from a hallway dump. | PC to gather, cloud to write up |
+<<<<<<< HEAD
 | 0.3 | **Done locally (36 tests pass); first CI run happens on the pull request.** Add a pure-C# project `src/NIVR.Gestures` (no Unity, no game types; `System.Numerics`) with: hand kinematics filter, proximity/zone tests, push/pull, grab-hold, stroke, throw, lean-in, nod/shake, raise-hands recognizers. Add an xUnit project and a GitHub Actions workflow that builds and tests only these two projects. | Cloud (written); first CI run in GitHub |
 | 0.4 | **Written and simulator-checked; headset check pending.** Request velocity in `LocateSpace` and expose `Velocity` / `AngularVelocity` on `VRController`. | Write in cloud; verify on PC |
+=======
+| 0.3 | Add a pure-C# project `src/NIVR.Gestures` (no Unity, no game types; `System.Numerics`) with: hand kinematics filter, proximity/zone tests, push/pull, grab-hold, stroke, throw, lean-in, nod/shake, raise-hands recognizers. Add an xUnit project and a GitHub Actions workflow that builds and tests only these two projects. | Cloud (written); first CI run in GitHub |
+| 0.4 | **Runtime velocities confirmed in the headset; axis signs still to read off the self-check.** Request velocity in `LocateSpace` and expose `Velocity` / `AngularVelocity` on `VRController`. | Write in cloud; verify on PC |
+>>>>>>> claude/phase0-kinematics-seam
 | 0.5 | **Done in the simulator; headset tick check pending.** Introduce the feature-module seam: a small `IMotionModule` (`Tick(frame)`, `OnModeChanged`), a fixed tick order in `VRCoreBehaviour.Update`, and an input-arbitration object replacing the `Swallow*` statics for new code. | Write in cloud; compile and regression-test on PC |
 | 0.6 | Extend the simulator: scripted hand paths (`simpath l|r <name>`), so gestures can be exercised and screenshotted without a headset. | PC |
 | 0.7 | Confirm physical crouch's positive case and haptics in the headset (open items from 0.2.0). | Headset |
@@ -455,6 +460,15 @@ that could not be done from this session and is on the headset checklist.
 Surprise: none in the code. One design decision worth knowing: velocities are relative to the play space, not to the
 game world, so a snap turn or a scripted camera move does not look like a hand movement.
 
+#### 9.3.1 First headset run (2026-10-10)
+
+The first `kin` run in the headset showed `src=derived`: the velocity structure type was 12 instead of 43, so SteamVR
+ignored the request. Fixed and re-run: `src=runtime` on both hands with plausible values (rest 0.00 to 0.02 m/s,
+swings up to 1.3 m/s). The run was cut short before a clean forward / up / right sequence, so instead of asking for
+that again, `kin` now compares the runtime velocity with the pose difference by itself and prints the velocity in the
+head's frame (DEV_NOTES 2.18). The no-op module was seen ticking in the headset ("Motion module 'noop' is ticking"
+right after the session started).
+
 ### 9.4 Module seam, task 0.5 (2026-10-10)
 
 `plugin/Core/Motion/`: `IMotionModule`, `MotionFrame`, `InputArbiter`, `MotionModules` (fixed order) and a no-op
@@ -500,8 +514,8 @@ Things to know:
 | Exit criterion | State |
 |---|---|
 | `INTERACTION_INVENTORY.md` has no inferred rows for hallway objects | **Not met.** Night-save facts are verified; daytime values, the cigarette / cat / hatch target bounds and three animation values are open (inventory section 9) |
-| CI is green on the gesture library | Pending the first run on the pull request |
-| A no-op module ticks in the headset without changing behaviour | Simulator only; headset pending |
+| CI is green on the gesture library | **Met**: the Gestures workflow passed on the gesture-library pull request |
+| A no-op module ticks in the headset without changing behaviour | Ticks in the headset (seen in the log); the regression play-through in the headset is still pending |
 
 Not started in this pass: 0.6 (scripted hand paths in the simulator), 0.7 (physical crouch and haptics in the
 headset), 0.8 (docs cleanup).

@@ -62,6 +62,16 @@ public sealed class VRController
     /// <summary>True when the runtime reported the grip velocity; false when it is derived from pose differences.</summary>
     public bool VelocityFromRuntime { get; private set; }
 
+    /// <summary>
+    /// Self-check of the runtime's velocities against the pose differences (grip): while the hand moves fast, the mean
+    /// cosine between the two directions (1 = same direction, -1 = an axis sign is wrong) and the mean speed ratio
+    /// (runtime / derived, about 1 when the units are right). Counts only frames where both exist.
+    /// </summary>
+    internal (int samples, float cos, float ratio, int angSamples, float angCos) RuntimeAgreement
+        => (_grip.Samples, _grip.Samples > 0 ? _grip.CosSum / _grip.Samples : 0f, _grip.Samples > 0 ? _grip.RatioSum / _grip.Samples : 0f,
+            _grip.AngSamples, _grip.AngSamples > 0 ? _grip.AngCosSum / _grip.AngSamples : 0f);
+    internal void ResetAgreement() { _grip.ClearAgreement(); _aim.ClearAgreement(); }
+
     /// <summary>Time constant of the velocity smoothing, seconds. Short: throws and flicks last about 0.1 s.</summary>
     internal const float VelocitySmoothing = 0.04f;
     private PoseKinematics _grip, _aim;
@@ -85,22 +95,39 @@ public sealed class VRController
     /// <summary>Velocity of one tracked pose: the runtime's value when given, else the pose difference, low-pass filtered.</summary>
     private struct PoseKinematics
     {
+        // Agreement check thresholds: below these the direction of a velocity is mostly noise.
+        private const float CheckSpeed = 0.3f, CheckSpin = 1.5f; // m/s, rad/s
+
         public Vector3 Linear, Angular;
+        private Vector3 _derivedLinear, _derivedAngular;
         private Vector3 _lastPos; private Quaternion _lastRot; private bool _hasLast;
+        public int Samples, AngSamples; public float CosSum, RatioSum, AngCosSum;
 
         public void Step(float dt, bool tracked, Vector3 pos, Quaternion rot, Vector3? linear, Vector3? angular)
         {
-            if (!tracked) { _hasLast = false; Linear = Angular = Vector3.zero; return; }
+            if (!tracked) { _hasLast = false; Linear = Angular = _derivedLinear = _derivedAngular = Vector3.zero; return; }
             if (dt > 1e-5f)
             {
-                Vector3 lin = linear ?? (_hasLast ? (pos - _lastPos) / dt : Vector3.zero);
-                Vector3 ang = angular ?? (_hasLast ? AngularFromDelta(rot * Quaternion.Inverse(_lastRot), dt) : Vector3.zero);
                 float k = 1f - Mathf.Exp(-dt / VelocitySmoothing);
-                Linear = Vector3.Lerp(Linear, lin, k);
-                Angular = Vector3.Lerp(Angular, ang, k);
+                Vector3 dLin = _hasLast ? (pos - _lastPos) / dt : Vector3.zero;
+                Vector3 dAng = _hasLast ? AngularFromDelta(rot * Quaternion.Inverse(_lastRot), dt) : Vector3.zero;
+                _derivedLinear = Vector3.Lerp(_derivedLinear, dLin, k);
+                _derivedAngular = Vector3.Lerp(_derivedAngular, dAng, k);
+                Linear = Vector3.Lerp(Linear, linear ?? dLin, k);
+                Angular = Vector3.Lerp(Angular, angular ?? dAng, k);
+                if (linear.HasValue && _hasLast && Linear.magnitude > CheckSpeed && _derivedLinear.magnitude > CheckSpeed)
+                {
+                    Samples++; CosSum += Vector3.Dot(Linear.normalized, _derivedLinear.normalized); RatioSum += Linear.magnitude / _derivedLinear.magnitude;
+                }
+                if (angular.HasValue && _hasLast && Angular.magnitude > CheckSpin && _derivedAngular.magnitude > CheckSpin)
+                {
+                    AngSamples++; AngCosSum += Vector3.Dot(Angular.normalized, _derivedAngular.normalized);
+                }
             }
             _lastPos = pos; _lastRot = rot; _hasLast = true;
         }
+
+        public void ClearAgreement() { Samples = AngSamples = 0; CosSum = RatioSum = AngCosSum = 0f; }
 
         private static Vector3 AngularFromDelta(Quaternion d, float dt)
         {

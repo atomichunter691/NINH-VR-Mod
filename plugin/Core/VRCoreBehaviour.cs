@@ -1285,6 +1285,7 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
             case "kin": // kin [seconds]: log both hands' velocities twice a second (wave a controller, then read nivr.log)
                 _kinUntil = Time.unscaledTime + (p.Length > 1 ? F(p[1]) : 10f);
                 _kinNext = 0f; _kinPeak[0] = _kinPeak[1] = _kinPeakAng[0] = _kinPeakAng[1] = 0f;
+                VRRig.LeftController.ResetAgreement(); VRRig.RightController.ResetAgreement();
                 break;
             default: CorePlugin.Log.LogWarning("unknown vr command " + p[0]); break;
         }
@@ -1294,7 +1295,12 @@ public unsafe class VRCoreBehaviour : MonoBehaviour
     {
         if (!c.IsTracked) return $"{c.Hand} untracked";
         Vector3 v = c.Velocity, w = c.AngularVelocity * Mathf.Rad2Deg;
-        return $"{c.Hand} vel={v.ToString("F2")} speed={v.magnitude:F2}m/s ang={w.ToString("F0")} spin={w.magnitude:F0}deg/s aimSpeed={c.AimVelocity.magnitude:F2}m/s src={(c.VelocityFromRuntime ? "runtime" : "derived")}";
+        // Head frame (right, up, forward), so a push straight ahead reads as +forward whatever the rig's heading.
+        var head = VRRig.Head.Transform;
+        Vector3 hv = head != null ? head.InverseTransformDirection(v) : v;
+        var (n, cos, ratio, an, acos) = c.RuntimeAgreement;
+        string check = n > 0 || an > 0 ? $" check: lin n={n} cos={cos:F2} ratio={ratio:F2} ang n={an} cos={acos:F2}" : "";
+        return $"{c.Hand} vel={v.ToString("F2")} head(r,u,f)={hv.ToString("F2")} speed={v.magnitude:F2}m/s ang={w.ToString("F0")} spin={w.magnitude:F0}deg/s aimSpeed={c.AimVelocity.magnitude:F2}m/s src={(c.VelocityFromRuntime ? "runtime" : "derived")}{check}";
     }
 
     private float _kinUntil, _kinNext;
