@@ -12,6 +12,8 @@ internal struct HandState
     public bool stickClick, primary, secondary, menu;
     public bool gripValid, aimValid;
     public XrPosef gripPose, aimPose; // in the tracking space passed to Read
+    public XrVector3f gripLinear, gripAngular, aimLinear, aimAngular; // m/s and rad/s in that space
+    public ulong gripVelFlags, aimVelFlags; // Xr.VelLinearValid | Xr.VelAngularValid, 0 when the runtime gave none
 }
 
 /// <summary>One action set with the usual controller actions, bound for the common interaction profiles.</summary>
@@ -159,8 +161,8 @@ internal sealed unsafe class XrInput
             var v = new XrActionStateVector2f { type = XrStructureType.ActionStateVector2f };
             if (Xr.xrGetActionStateVector2f(xr.Session, &gi, &v) >= 0 && v.isActive != 0) { s.stickX = v.currentState.x; s.stickY = v.currentState.y; }
 
-            if (_gripSpace[h] != 0) s.gripValid = xr.LocateSpace(_gripSpace[h], trackingSpace, time, out s.gripPose, out _);
-            if (_aimSpace[h] != 0) s.aimValid = xr.LocateSpace(_aimSpace[h], trackingSpace, time, out s.aimPose, out _);
+            if (_gripSpace[h] != 0) s.gripValid = xr.LocateSpace(_gripSpace[h], trackingSpace, time, out s.gripPose, out _, out s.gripLinear, out s.gripAngular, out s.gripVelFlags);
+            if (_aimSpace[h] != 0) s.aimValid = xr.LocateSpace(_aimSpace[h], trackingSpace, time, out s.aimPose, out _, out s.aimLinear, out s.aimAngular, out s.aimVelFlags);
             s.active |= s.gripValid || s.aimValid;
         }
         return true;
