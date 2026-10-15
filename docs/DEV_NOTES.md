@@ -942,9 +942,19 @@ Needed by every gesture that depends on how fast a hand moves (throw, stroke, fl
   (time constant `VRController.VelocitySmoothing`, 0.04 s), so a consumer sees one kind of signal.
 * Debug: `status` has a `hands:` line (velocity, speed, angular velocity in degrees per second, aim speed, source);
   `kin [seconds]` logs both hands twice a second with the peak speed since the previous line.
-* Verified in the simulator only: `simhand r ...` moved by 0.3 m between two frames gives a derived peak of about
-  7 m/s that decays to 0; a 60 degree yaw step gives a spin peak and no linear speed. **Not verified: the runtime
-  path** (flags, units, axis signs on a real controller). That is the first item of the next headset session.
+* Simulator: `simhand r ...` moved by 0.3 m between two frames gives a derived peak of about 7 m/s that decays to 0;
+  a 60 degree yaw step gives a spin peak and no linear speed. With the head turned 40 degrees, a forward step reads
+  `head(r,u,f)=(0, 0, 7.06)` and an upward step `(0, 7.02, 0)`.
+* **First headset run (2026-10-10, Quest through Virtual Desktop, SteamVR OpenXR 2.17.10).** It found a bug: the
+  structure type was 12 (`XR_TYPE_FRAME_END_INFO`) instead of 43, so the runtime ignored the chained struct and every
+  value was `src=derived`. Fixed. After the fix: `src=runtime` on both hands, a hand at rest reads 0.00 to 0.02 m/s and
+  under 10 degrees per second, ordinary swings 0.5 to 1.3 m/s and up to about 300 degrees per second. Plausible, but
+  the run was cut short before a clean forward / up / right sequence, so **the axis signs are still unconfirmed**.
+* Because of that, `kin` now checks itself: it also prints the velocity in the head's frame (`head(r,u,f)`), and
+  `check:` compares the runtime's velocity with the pose difference over every frame where the hand moves faster than
+  0.3 m/s (or 1.5 rad/s): `cos` near 1 means the runtime's direction matches the pose change (near -1 = an axis sign
+  is wrong), `ratio` near 1 means the units are right. Any movement during a `kin` run is enough to read it; the counts
+  restart with each `kin` command.
 
 ### 2.19 Motion-module seam and input arbitration (motion controls Phase 0.5) - 2026-10-10
 
